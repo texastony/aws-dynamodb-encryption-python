@@ -11,7 +11,6 @@
 # ANY KIND, either express or implied. See the License for the specific
 # language governing permissions and limitations under the License.
 """Acceptance tests for ``dynamodb_encryption_sdk_async.encrypted.client``."""
-"""Acceptance tests for ``dynamodb_encryption_sdk_async.encrypted.client``."""
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
