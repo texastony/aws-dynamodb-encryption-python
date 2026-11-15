@@ -10,15 +10,15 @@
 # distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF
 # ANY KIND, either express or implied. See the License for the specific
 # language governing permissions and limitations under the License.
-"""Acceptance tests for ``dynamodb_encryption_sdk.encrypted.table``."""
+"""Acceptance tests for ``dynamodb_encryption_sdk_async.encrypted.table``."""
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
 from boto3.resources.base import ServiceResource
-from mock import MagicMock
-from moto import mock_dynamodb2
 
-from dynamodb_encryption_sdk.encrypted.table import EncryptedTable
-from dynamodb_encryption_sdk.structures import TableIndex, TableInfo
-from dynamodb_encryption_sdk.transform import ddb_to_dict
+from dynamodb_encryption_sdk_async.encrypted.table import EncryptedTable
+from dynamodb_encryption_sdk_async.structures import TableIndex, TableInfo
+from dynamodb_encryption_sdk_async.transform import ddb_to_dict
 
 from ..acceptance_test_utils import load_scenarios
 
@@ -27,67 +27,41 @@ pytestmark = [pytest.mark.accept]
 
 def fake_table(item):
     table = MagicMock(__class__=ServiceResource)
-    table.get_item.return_value = {"Item": item}
+    table.get_item = AsyncMock(return_value={"Item": item})
     return table
 
 
-def _item_check(materials_provider, table_name, table_index, ciphertext_item, plaintext_item, attribute_actions, prep):
+async def _item_check(materials_provider, table_name, table_index, ciphertext_item, plaintext_item, attribute_actions):
     ciphertext_item = ddb_to_dict(ciphertext_item)
     plaintext_item = ddb_to_dict(plaintext_item)
-    metatable = None
-    try:
-        metatable = prep()  # Test scenario setup that needs to happen inside the test
-        cmp = materials_provider()  # Some of the materials providers need to be constructed inside the test
-        table = fake_table(ciphertext_item)
-        table_info = TableInfo(
-            name=table_name,
-            primary_index=TableIndex(partition=table_index["partition"], sort=table_index.get("sort", None)),
-        )
-        item_key = {table_info.primary_index.partition: ciphertext_item[table_info.primary_index.partition]}
-        if table_info.primary_index.sort is not None:
-            item_key[table_info.primary_index.sort] = ciphertext_item[table_info.primary_index.sort]
+    cmp = materials_provider()  # Some of the materials providers need to be constructed inside the test
+    table = fake_table(ciphertext_item)
+    table_info = TableInfo(
+        name=table_name,
+        primary_index=TableIndex(partition=table_index["partition"], sort=table_index.get("sort", None)),
+    )
+    item_key = {table_info.primary_index.partition: ciphertext_item[table_info.primary_index.partition]}
+    if table_info.primary_index.sort is not None:
+        item_key[table_info.primary_index.sort] = ciphertext_item[table_info.primary_index.sort]
 
-        e_table = EncryptedTable(
-            table=table,
-            materials_provider=cmp,
-            table_info=table_info,
-            attribute_actions=attribute_actions,
-            auto_refresh_table_indexes=False,
-        )
-        decrypted_item = e_table.get_item(Key=item_key)["Item"]
-        assert set(decrypted_item.keys()) == set(plaintext_item.keys())
-        for key in decrypted_item:
-            if key == "version":
-                continue
-            assert decrypted_item[key] == plaintext_item[key]
-    finally:
-        if metatable:
-            metatable.delete()
-            metatable.wait_until_not_exists()
+    e_table = EncryptedTable(
+        table=table,
+        materials_provider=cmp,
+        table_info=table_info,
+        attribute_actions=attribute_actions,
+        auto_refresh_table_indexes=False,
+    )
+    decrypted_item = (await e_table.get_item(Key=item_key))["Item"]
+    assert set(decrypted_item.keys()) == set(plaintext_item.keys())
+    for key in decrypted_item:
+        if key == "version":
+            continue
+        assert decrypted_item[key] == plaintext_item[key]
 
 
-@mock_dynamodb2
 @pytest.mark.local
-@pytest.mark.parametrize(
-    "materials_provider, table_name, table_index, ciphertext_item, plaintext_item, attribute_actions, prep",
-    load_scenarios(online=False),
-)
-def test_table_get_offline(
-    materials_provider, table_name, table_index, ciphertext_item, plaintext_item, attribute_actions, prep
+@pytest.mark.parametrize("materials_provider, table_name, table_index, ciphertext_item, plaintext_item, attribute_actions", load_scenarios(online=False))
+async def test_table_get_offline(
+    materials_provider, table_name, table_index, ciphertext_item, plaintext_item, attribute_actions
 ):
-    return _item_check(
-        materials_provider, table_name, table_index, ciphertext_item, plaintext_item, attribute_actions, prep
-    )
-
-
-@pytest.mark.ddb_integ
-@pytest.mark.parametrize(
-    "materials_provider, table_name, table_index, ciphertext_item, plaintext_item, attribute_actions, prep",
-    load_scenarios(online=True),
-)
-def test_table_get_online(
-    materials_provider, table_name, table_index, ciphertext_item, plaintext_item, attribute_actions, prep
-):
-    return _item_check(
-        materials_provider, table_name, table_index, ciphertext_item, plaintext_item, attribute_actions, prep
-    )
+    await _item_check(materials_provider, table_name, table_index, ciphertext_item, plaintext_item, attribute_actions)

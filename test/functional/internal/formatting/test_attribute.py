@@ -15,10 +15,10 @@ import hypothesis
 import pytest
 from boto3.dynamodb.types import TypeDeserializer, TypeSerializer
 
-from dynamodb_encryption_sdk.exceptions import DeserializationError, SerializationError
-from dynamodb_encryption_sdk.internal.formatting.deserialize.attribute import deserialize_attribute
-from dynamodb_encryption_sdk.internal.formatting.serialize.attribute import serialize_attribute
-from dynamodb_encryption_sdk.transform import ddb_to_dict, dict_to_ddb
+from dynamodb_encryption_sdk_async.exceptions import DeserializationError, SerializationError
+from dynamodb_encryption_sdk_async.internal.formatting.deserialize.attribute import deserialize_attribute
+from dynamodb_encryption_sdk_async.internal.formatting.serialize.attribute import serialize_attribute
+from dynamodb_encryption_sdk_async.transform import ddb_to_dict, dict_to_ddb
 
 from ...functional_test_vector_generators import attribute_test_vectors
 from ...hypothesis_strategies import SLOW_SETTINGS, VERY_SLOW_SETTINGS, ddb_attribute_values, ddb_items

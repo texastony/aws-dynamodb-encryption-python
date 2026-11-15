@@ -10,11 +10,11 @@
 # distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF
 # ANY KIND, either express or implied. See the License for the specific
 # language governing permissions and limitations under the License.
-"""Functional test suite for ``dynamodb_encryption_sdk.materials.raw``."""
+"""Functional test suite for ``dynamodb_encryption_sdk_async.materials.raw``."""
 import pytest
 
-from dynamodb_encryption_sdk.delegated_keys.jce import JceNameLocalDelegatedKey
-from dynamodb_encryption_sdk.materials.raw import RawDecryptionMaterials, RawEncryptionMaterials
+from dynamodb_encryption_sdk_async.delegated_keys.jce import JceNameLocalDelegatedKey
+from dynamodb_encryption_sdk_async.materials.raw import RawDecryptionMaterials, RawEncryptionMaterials
 
 pytestmark = [pytest.mark.functional, pytest.mark.local]
 

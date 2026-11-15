@@ -11,12 +11,12 @@
 # distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF
 # ANY KIND, either express or implied. See the License for the specific
 # language governing permissions and limitations under the License.
-"""Test suite for ``dynamodb_encryption_sdk.internal.str_ops``."""
+"""Test suite for ``dynamodb_encryption_sdk_async.internal.str_ops``."""
 import codecs
 
 import pytest
 
-from dynamodb_encryption_sdk.internal.str_ops import to_bytes, to_str
+from dynamodb_encryption_sdk_async.internal.str_ops import to_bytes, to_str
 
 pytestmark = [pytest.mark.functional, pytest.mark.local]
 

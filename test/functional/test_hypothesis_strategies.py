@@ -15,9 +15,9 @@ import hypothesis
 import pytest
 from boto3.dynamodb.types import DYNAMODB_CONTEXT
 
-from dynamodb_encryption_sdk.internal.formatting.deserialize.attribute import deserialize_attribute
-from dynamodb_encryption_sdk.internal.formatting.serialize.attribute import serialize_attribute
-from dynamodb_encryption_sdk.transform import ddb_to_dict, dict_to_ddb
+from dynamodb_encryption_sdk_async.internal.formatting.deserialize.attribute import deserialize_attribute
+from dynamodb_encryption_sdk_async.internal.formatting.serialize.attribute import serialize_attribute
+from dynamodb_encryption_sdk_async.transform import ddb_to_dict, dict_to_ddb
 
 from .hypothesis_strategies import VERY_SLOW_SETTINGS, ddb_items, ddb_negative_numbers, ddb_number, ddb_positive_numbers
 

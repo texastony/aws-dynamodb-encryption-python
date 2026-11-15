@@ -10,16 +10,16 @@
 # distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF
 # ANY KIND, either express or implied. See the License for the specific
 # language governing permissions and limitations under the License.
-"""Unit tests for ``dynamodb_encryption_sdk.material_providers.wrapped``."""
+"""Unit tests for ``dynamodb_encryption_sdk_async.material_providers.wrapped``."""
 import pytest
 from mock import MagicMock
 from pytest_mock import mocker  # noqa pylint: disable=unused-import
 
-import dynamodb_encryption_sdk.material_providers.wrapped
-from dynamodb_encryption_sdk.delegated_keys import DelegatedKey
-from dynamodb_encryption_sdk.exceptions import UnwrappingError, WrappingError
-from dynamodb_encryption_sdk.material_providers.wrapped import WrappedCryptographicMaterialsProvider
-from dynamodb_encryption_sdk.structures import EncryptionContext
+import dynamodb_encryption_sdk_async.material_providers.wrapped
+from dynamodb_encryption_sdk_async.delegated_keys import DelegatedKey
+from dynamodb_encryption_sdk_async.exceptions import UnwrappingError, WrappingError
+from dynamodb_encryption_sdk_async.material_providers.wrapped import WrappedCryptographicMaterialsProvider
+from dynamodb_encryption_sdk_async.structures import EncryptionContext
 
 pytestmark = [pytest.mark.unit, pytest.mark.local]
 
@@ -31,11 +31,11 @@ pytestmark = [pytest.mark.unit, pytest.mark.local]
         ("encryption_materials", WrappingError, "Encryption materials cannot be provided: no wrapping key"),
     ),
 )
-def test_no_materials(method, error_type, message):
+async def test_no_materials(method, error_type, message):
     empty_cmp = WrappedCryptographicMaterialsProvider(signing_key=MagicMock(__class__=DelegatedKey))
 
     with pytest.raises(error_type) as excinfo:
-        getattr(empty_cmp, method)(EncryptionContext())
+        await getattr(empty_cmp, method)(EncryptionContext())
 
     excinfo.match(message)
 
@@ -53,7 +53,7 @@ def test_attrs_fail(invalid_kwargs):
 
 
 @pytest.mark.parametrize("method", ("decryption_materials", "encryption_materials"))
-def test_valid_materials(mocker, method):
+async def test_valid_materials(mocker, method):
     mocker.patch.object(WrappedCryptographicMaterialsProvider, "_build_materials")
 
     cmp = WrappedCryptographicMaterialsProvider(
@@ -63,14 +63,14 @@ def test_valid_materials(mocker, method):
     )
 
     context = EncryptionContext()
-    test = getattr(cmp, method)(context)
+    test = await getattr(cmp, method)(context)
 
     WrappedCryptographicMaterialsProvider._build_materials.assert_called_once_with(context)
     assert test is WrappedCryptographicMaterialsProvider._build_materials.return_value
 
 
 def test_build_materials(mocker):
-    mocker.patch.object(dynamodb_encryption_sdk.material_providers.wrapped, "WrappedCryptographicMaterials")
+    mocker.patch.object(dynamodb_encryption_sdk_async.material_providers.wrapped, "WrappedCryptographicMaterials")
 
     cmp = WrappedCryptographicMaterialsProvider(
         signing_key=MagicMock(__class__=DelegatedKey),
@@ -82,10 +82,10 @@ def test_build_materials(mocker):
     context = EncryptionContext(material_description=material_description)
     test = cmp._build_materials(context)
 
-    dynamodb_encryption_sdk.material_providers.wrapped.WrappedCryptographicMaterials.assert_called_once_with(
+    dynamodb_encryption_sdk_async.material_providers.wrapped.WrappedCryptographicMaterials.assert_called_once_with(
         wrapping_key=cmp._wrapping_key,
         unwrapping_key=cmp._unwrapping_key,
         signing_key=cmp._signing_key,
         material_description=material_description,
     )
-    assert test is dynamodb_encryption_sdk.material_providers.wrapped.WrappedCryptographicMaterials.return_value
+    assert test is dynamodb_encryption_sdk_async.material_providers.wrapped.WrappedCryptographicMaterials.return_value

@@ -10,12 +10,12 @@
 # distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF
 # ANY KIND, either express or implied. See the License for the specific
 # language governing permissions and limitations under the License.
-"""Functional tests for ``dynamodb_encryption_sdk.identifiers``."""
+"""Functional tests for ``dynamodb_encryption_sdk_async.identifiers``."""
 import operator
 
 import pytest
 
-from dynamodb_encryption_sdk.identifiers import CryptoAction
+from dynamodb_encryption_sdk_async.identifiers import CryptoAction
 
 pytestmark = [pytest.mark.functional, pytest.mark.local]
 

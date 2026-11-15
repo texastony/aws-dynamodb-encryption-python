@@ -1,4 +1,4 @@
 Encrypted Table Resource
 ------------------------
 
-.. automodule:: dynamodb_encryption_sdk.encrypted.table
+.. automodule:: dynamodb_encryption_sdk_async.encrypted.table

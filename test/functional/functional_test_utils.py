@@ -13,36 +13,34 @@
 """Helper tools for use in tests."""
 from __future__ import division
 
-import base64
 import copy
 import itertools
 import os
+import socket
 from collections import defaultdict
 from decimal import Decimal
+from unittest.mock import AsyncMock, patch
 
+import aioboto3
 import boto3
 import pytest
 from boto3.dynamodb.types import Binary
-from botocore.exceptions import NoRegionError
-from mock import patch
-from moto import mock_dynamodb2
+from moto.server import ThreadedMotoServer
 
-from dynamodb_encryption_sdk.delegated_keys.jce import JceNameLocalDelegatedKey
-from dynamodb_encryption_sdk.encrypted.client import EncryptedClient
-from dynamodb_encryption_sdk.encrypted.item import decrypt_python_item, encrypt_python_item
-from dynamodb_encryption_sdk.encrypted.resource import EncryptedResource
-from dynamodb_encryption_sdk.encrypted.table import EncryptedTable
-from dynamodb_encryption_sdk.identifiers import CryptoAction
-from dynamodb_encryption_sdk.internal.identifiers import ReservedAttributes
-from dynamodb_encryption_sdk.material_providers import CryptographicMaterialsProvider
-from dynamodb_encryption_sdk.material_providers.most_recent import CachingMostRecentProvider
-from dynamodb_encryption_sdk.material_providers.static import StaticCryptographicMaterialsProvider
-from dynamodb_encryption_sdk.material_providers.store.meta import MetaStore
-from dynamodb_encryption_sdk.material_providers.wrapped import WrappedCryptographicMaterialsProvider
-from dynamodb_encryption_sdk.materials import CryptographicMaterials
-from dynamodb_encryption_sdk.materials.raw import RawDecryptionMaterials, RawEncryptionMaterials
-from dynamodb_encryption_sdk.structures import AttributeActions, EncryptionContext
-from dynamodb_encryption_sdk.transform import ddb_to_dict, dict_to_ddb
+from dynamodb_encryption_sdk_async.delegated_keys.jce import JceNameLocalDelegatedKey
+from dynamodb_encryption_sdk_async.encrypted.client import EncryptedClient
+from dynamodb_encryption_sdk_async.encrypted.item import decrypt_python_item, encrypt_python_item
+from dynamodb_encryption_sdk_async.encrypted.resource import EncryptedResource
+from dynamodb_encryption_sdk_async.encrypted.table import EncryptedTable
+from dynamodb_encryption_sdk_async.identifiers import CryptoAction
+from dynamodb_encryption_sdk_async.internal.identifiers import ReservedAttributes
+from dynamodb_encryption_sdk_async.material_providers import CryptographicMaterialsProvider
+from dynamodb_encryption_sdk_async.material_providers.static import StaticCryptographicMaterialsProvider
+from dynamodb_encryption_sdk_async.material_providers.wrapped import WrappedCryptographicMaterialsProvider
+from dynamodb_encryption_sdk_async.materials import CryptographicMaterials
+from dynamodb_encryption_sdk_async.materials.raw import RawDecryptionMaterials, RawEncryptionMaterials
+from dynamodb_encryption_sdk_async.structures import AttributeActions, EncryptionContext
+from dynamodb_encryption_sdk_async.transform import ddb_to_dict, dict_to_ddb
 
 RUNNING_IN_TRAVIS = "TRAVIS" in os.environ
 _DELEGATED_KEY_CACHE = defaultdict(lambda: defaultdict(dict))
@@ -78,11 +76,43 @@ TEST_BATCH_INDEXES = [
 TEST_BATCH_KEYS = [{name: value["value"] for name, value in key.items()} for key in TEST_BATCH_INDEXES]
 
 
+_MOTO_ENVIRONMENT = {
+    "AWS_ACCESS_KEY_ID": "testing",
+    "AWS_SECRET_ACCESS_KEY": "testing",
+    "AWS_SESSION_TOKEN": "testing",
+    "AWS_DEFAULT_REGION": TEST_REGION_NAME,
+}
+
+
+def _free_port():
+    with socket.socket() as sock:
+        sock.bind(("127.0.0.1", 0))
+        return sock.getsockname()[1]
+
+
 @pytest.fixture(scope="module")
 def mock_ddb_service():
-    """Centralize service mock to avoid resetting service for tests that use multiple tables."""
-    with mock_dynamodb2():
+    """Centralize service mock to avoid resetting service for tests that use multiple tables.
+
+    moto's in-process mocks patch botocore's HTTP layer, which aiobotocore (aiohttp) does not use,
+    so DynamoDB is a moto *server*. ``AWS_ENDPOINT_URL_DYNAMODB`` points every client at it, sync
+    (table setup) and async (the code under test) alike.
+    """
+    server = ThreadedMotoServer(ip_address="127.0.0.1", port=_free_port(), verbose=False)
+    server.start()
+    host, port = server.get_host_and_port()
+    environment = dict(_MOTO_ENVIRONMENT, AWS_ENDPOINT_URL_DYNAMODB="http://{}:{}".format(host, port))
+    saved = {name: os.environ.get(name) for name in environment}
+    os.environ.update(environment)
+    try:
         yield boto3.client("dynamodb", region_name=TEST_REGION_NAME)
+    finally:
+        for name, value in saved.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
+        server.stop()
 
 
 @pytest.fixture
@@ -182,19 +212,19 @@ class PassThroughCryptographicMaterialsProviderThatRequiresAttributes(Cryptograp
         if not encryption_context.attributes:
             raise ValueError("Encryption context attributes MUST be set!")
 
-    def decryption_materials(self, encryption_context):
+    async def decryption_materials(self, encryption_context):
         # type: (EncryptionContext) -> CryptographicMaterials
         self._assert_attributes_set(encryption_context)
-        return self._passthrough_cmp.decryption_materials(encryption_context)
+        return await self._passthrough_cmp.decryption_materials(encryption_context)
 
-    def encryption_materials(self, encryption_context):
+    async def encryption_materials(self, encryption_context):
         # type: (EncryptionContext) -> CryptographicMaterials
         self._assert_attributes_set(encryption_context)
-        return self._passthrough_cmp.encryption_materials(encryption_context)
+        return await self._passthrough_cmp.encryption_materials(encryption_context)
 
-    def refresh(self):
+    async def refresh(self):
         # type: () -> None
-        self._passthrough_cmp.refresh()
+        await self._passthrough_cmp.refresh()
 
 
 def _get_from_cache(dk_class, algorithm, key_length):
@@ -388,7 +418,7 @@ def diverse_item():
 _reserved_attributes = {attr.value for attr in ReservedAttributes}
 
 
-def return_requestitems_as_unprocessed(*args, **kwargs):
+async def return_requestitems_as_unprocessed(*args, **kwargs):
     return {"UnprocessedItems": kwargs["RequestItems"]}
 
 
@@ -467,14 +497,14 @@ def _generate_items(initial_item, write_transformer):
     return items
 
 
-def _cleanup_items(encrypted, write_transformer, table_name=TEST_TABLE_NAME):
+async def _cleanup_items(encrypted, write_transformer, table_name=TEST_TABLE_NAME):
     ddb_keys = [write_transformer(key) for key in TEST_BATCH_KEYS]
-    _delete_result = encrypted.batch_write_item(  # noqa
+    _delete_result = await encrypted.batch_write_item(  # noqa
         RequestItems={table_name: [{"DeleteRequest": {"Key": _key}} for _key in ddb_keys]}
     )
 
 
-def cycle_batch_item_check(
+async def cycle_batch_item_check(
     raw,
     encrypted,
     initial_actions,
@@ -490,13 +520,13 @@ def cycle_batch_item_check(
     items = _generate_items(initial_item, write_transformer)
     items_in_table = len(items)
 
-    _put_result = encrypted.batch_write_item(  # noqa
+    _put_result = await encrypted.batch_write_item(  # noqa
         RequestItems={table_name: [{"PutRequest": {"Item": _item}} for _item in items]}
     )
 
     try:
         ddb_keys = [write_transformer(key) for key in TEST_BATCH_KEYS]
-        encrypted_result = raw.batch_get_item(RequestItems={table_name: {"Keys": ddb_keys}})
+        encrypted_result = await raw.batch_get_item(RequestItems={table_name: {"Keys": ddb_keys}})
         check_many_encrypted_items(
             actual=encrypted_result["Responses"][table_name],
             expected=items,
@@ -504,13 +534,13 @@ def cycle_batch_item_check(
             transformer=read_transformer,
         )
 
-        decrypted_result = encrypted.batch_get_item(RequestItems={table_name: {"Keys": ddb_keys}})
+        decrypted_result = await encrypted.batch_get_item(RequestItems={table_name: {"Keys": ddb_keys}})
         assert_equal_lists_of_items(
             actual=decrypted_result["Responses"][table_name], expected=items, transformer=read_transformer
         )
     finally:
         if delete_items:
-            _cleanup_items(encrypted, write_transformer, table_name)
+            await _cleanup_items(encrypted, write_transformer, table_name)
             items_in_table = 0
 
     del check_attribute_actions
@@ -518,41 +548,41 @@ def cycle_batch_item_check(
     return items_in_table
 
 
-def cycle_batch_writer_check(raw_table, encrypted_table, initial_actions, initial_item):
+async def cycle_batch_writer_check(raw_table, encrypted_table, initial_actions, initial_item):
     """Cycling (plaintext->encrypted->decrypted) items with the Table batch writer should have the expected results."""
     check_attribute_actions = initial_actions.copy()
     check_attribute_actions.set_index_keys(*list(TEST_KEY.keys()))
     items = _generate_items(initial_item, _nop_transformer)
 
-    with encrypted_table.batch_writer() as writer:
+    async with encrypted_table.batch_writer() as writer:
         for item in items:
-            writer.put_item(item)
+            await writer.put_item(item)
 
     ddb_keys = copy.copy(TEST_BATCH_KEYS)
-    encrypted_items = [raw_table.get_item(Key=key, ConsistentRead=True)["Item"] for key in ddb_keys]
+    encrypted_items = [(await raw_table.get_item(Key=key, ConsistentRead=True))["Item"] for key in ddb_keys]
     check_many_encrypted_items(
         actual=encrypted_items, expected=items, attribute_actions=check_attribute_actions, transformer=_nop_transformer
     )
 
-    decrypted_result = [encrypted_table.get_item(Key=key, ConsistentRead=True)["Item"] for key in ddb_keys]
+    decrypted_result = [(await encrypted_table.get_item(Key=key, ConsistentRead=True))["Item"] for key in ddb_keys]
     assert_equal_lists_of_items(actual=decrypted_result, expected=items, transformer=_nop_transformer)
 
-    with encrypted_table.batch_writer() as writer:
+    async with encrypted_table.batch_writer() as writer:
         for key in ddb_keys:
-            writer.delete_item(key)
+            await writer.delete_item(key)
 
     del check_attribute_actions
     del items
 
 
-def batch_write_item_unprocessed_check(
+async def batch_write_item_unprocessed_check(
     encrypted, initial_item, write_transformer=_nop_transformer, table_name=TEST_TABLE_NAME
 ):
     """Check that unprocessed items in a batch result are unencrypted."""
     items = _generate_items(initial_item, write_transformer)
 
     request_items = {table_name: [{"PutRequest": {"Item": _item}} for _item in items]}
-    _put_result = encrypted.batch_write_item(RequestItems=request_items)
+    _put_result = await encrypted.batch_write_item(RequestItems=request_items)
 
     # we expect results to include Unprocessed items, or the test case is invalid!
     unprocessed_items = _put_result["UnprocessedItems"]
@@ -564,120 +594,122 @@ def batch_write_item_unprocessed_check(
     del items
 
 
-def cycle_item_check(plaintext_item, crypto_config):
+async def cycle_item_check(plaintext_item, crypto_config):
     """Check that cycling (plaintext->encrypted->decrypted) an item has the expected results."""
-    ciphertext_item = encrypt_python_item(plaintext_item, crypto_config)
+    ciphertext_item = await encrypt_python_item(plaintext_item, crypto_config)
 
     check_encrypted_item(plaintext_item, ciphertext_item, crypto_config.attribute_actions)
 
-    cycled_item = decrypt_python_item(ciphertext_item, crypto_config)
+    cycled_item = await decrypt_python_item(ciphertext_item, crypto_config)
 
     assert cycled_item == plaintext_item
     del ciphertext_item
     del cycled_item
 
 
-def table_cycle_check(materials_provider, initial_actions, initial_item, table_name, region_name=None):
+def _session():
+    return aioboto3.Session()
+
+
+def _client_kwargs(region_name):
+    return {} if region_name is None else {"region_name": region_name}
+
+
+async def table_cycle_check(materials_provider, initial_actions, initial_item, table_name, region_name=None):
     check_attribute_actions = initial_actions.copy()
     check_attribute_actions.set_index_keys(*list(TEST_KEY.keys()))
     item = initial_item.copy()
     item.update(TEST_KEY)
 
-    kwargs = {}
-    if region_name is not None:
-        kwargs["region_name"] = region_name
-    table = boto3.resource("dynamodb", **kwargs).Table(table_name)
-    e_table = EncryptedTable(table=table, materials_provider=materials_provider, attribute_actions=initial_actions)
+    async with _session().resource("dynamodb", **_client_kwargs(region_name)) as resource:
+        table = await resource.Table(table_name)
+        e_table = EncryptedTable(table=table, materials_provider=materials_provider, attribute_actions=initial_actions)
 
-    _put_result = e_table.put_item(Item=item)  # noqa
+        _put_result = await e_table.put_item(Item=item)  # noqa
 
-    encrypted_result = table.get_item(Key=TEST_KEY, ConsistentRead=True)
-    check_encrypted_item(item, encrypted_result["Item"], check_attribute_actions)
+        encrypted_result = await table.get_item(Key=TEST_KEY, ConsistentRead=True)
+        check_encrypted_item(item, encrypted_result["Item"], check_attribute_actions)
 
-    decrypted_result = e_table.get_item(Key=TEST_KEY, ConsistentRead=True)
-    assert decrypted_result["Item"] == item
+        decrypted_result = await e_table.get_item(Key=TEST_KEY, ConsistentRead=True)
+        assert decrypted_result["Item"] == item
 
-    e_table.delete_item(Key=TEST_KEY)
+        await e_table.delete_item(Key=TEST_KEY)
     del item
     del check_attribute_actions
 
 
-def table_cycle_batch_writer_check(materials_provider, initial_actions, initial_item, table_name, region_name=None):
-    kwargs = {}
-    if region_name is not None:
-        kwargs["region_name"] = region_name
-    table = boto3.resource("dynamodb", **kwargs).Table(table_name)
-    e_table = EncryptedTable(table=table, materials_provider=materials_provider, attribute_actions=initial_actions)
-
-    cycle_batch_writer_check(table, e_table, initial_actions, initial_item)
-
-
-def table_batch_writer_unprocessed_items_check(
+async def table_cycle_batch_writer_check(
     materials_provider, initial_actions, initial_item, table_name, region_name=None
 ):
-    kwargs = {}
-    if region_name is not None:
-        kwargs["region_name"] = region_name
-    resource = boto3.resource("dynamodb", **kwargs)
-    table = resource.Table(table_name)
-
-    items = _generate_items(initial_item, _nop_transformer)
-    request_items = {table_name: [{"PutRequest": {"Item": _item}} for _item in items]}
-
-    with patch.object(table.meta.client, "batch_write_item") as batch_write_mock:
-        # Check that unprocessed items returned to a BatchWriter are successfully retried
-        batch_write_mock.side_effect = [{"UnprocessedItems": request_items}, {"UnprocessedItems": {}}]
+    async with _session().resource("dynamodb", **_client_kwargs(region_name)) as resource:
+        table = await resource.Table(table_name)
         e_table = EncryptedTable(table=table, materials_provider=materials_provider, attribute_actions=initial_actions)
 
-        with e_table.batch_writer() as writer:
-            for item in items:
-                writer.put_item(item)
+        await cycle_batch_writer_check(table, e_table, initial_actions, initial_item)
+
+
+async def table_batch_writer_unprocessed_items_check(
+    materials_provider, initial_actions, initial_item, table_name, region_name=None
+):
+    async with _session().resource("dynamodb", **_client_kwargs(region_name)) as resource:
+        table = await resource.Table(table_name)
+
+        items = _generate_items(initial_item, _nop_transformer)
+        request_items = {table_name: [{"PutRequest": {"Item": _item}} for _item in items]}
+
+        with patch.object(table.meta.client, "batch_write_item", new_callable=AsyncMock) as batch_write_mock:
+            # Check that unprocessed items returned to a BatchWriter are successfully retried
+            batch_write_mock.side_effect = [{"UnprocessedItems": request_items}, {"UnprocessedItems": {}}]
+            e_table = EncryptedTable(
+                table=table, materials_provider=materials_provider, attribute_actions=initial_actions
+            )
+
+            async with e_table.batch_writer() as writer:
+                for item in items:
+                    await writer.put_item(item)
 
     del items
 
 
-def resource_cycle_batch_items_check(materials_provider, initial_actions, initial_item, table_name, region_name=None):
-    kwargs = {}
-    if region_name is not None:
-        kwargs["region_name"] = region_name
-    resource = boto3.resource("dynamodb", **kwargs)
-    e_resource = EncryptedResource(
-        resource=resource, materials_provider=materials_provider, attribute_actions=initial_actions
-    )
-
-    cycle_batch_item_check(
-        raw=resource,
-        encrypted=e_resource,
-        initial_actions=initial_actions,
-        initial_item=initial_item,
-        table_name=table_name,
-    )
-
-    raw_scan_result = resource.Table(table_name).scan(ConsistentRead=True)
-    e_scan_result = e_resource.Table(table_name).scan(ConsistentRead=True)
-    assert not raw_scan_result["Items"]
-    assert not e_scan_result["Items"]
-
-
-def resource_batch_items_unprocessed_check(
+async def resource_cycle_batch_items_check(
     materials_provider, initial_actions, initial_item, table_name, region_name=None
 ):
-    kwargs = {}
-    if region_name is not None:
-        kwargs["region_name"] = region_name
-    resource = boto3.resource("dynamodb", **kwargs)
-
-    with patch.object(resource, "batch_write_item", return_requestitems_as_unprocessed):
+    async with _session().resource("dynamodb", **_client_kwargs(region_name)) as resource:
         e_resource = EncryptedResource(
             resource=resource, materials_provider=materials_provider, attribute_actions=initial_actions
         )
 
-        batch_write_item_unprocessed_check(
-            encrypted=e_resource, initial_item=initial_item, write_transformer=dict_to_ddb, table_name=table_name
+        await cycle_batch_item_check(
+            raw=resource,
+            encrypted=e_resource,
+            initial_actions=initial_actions,
+            initial_item=initial_item,
+            table_name=table_name,
         )
 
+        raw_scan_result = await (await resource.Table(table_name)).scan(ConsistentRead=True)
+        e_scan_result = await (await e_resource.Table(table_name)).scan(ConsistentRead=True)
+        assert not raw_scan_result["Items"]
+        assert not e_scan_result["Items"]
 
-def client_cycle_single_item_check(materials_provider, initial_actions, initial_item, table_name, region_name=None):
+
+async def resource_batch_items_unprocessed_check(
+    materials_provider, initial_actions, initial_item, table_name, region_name=None
+):
+    async with _session().resource("dynamodb", **_client_kwargs(region_name)) as resource:
+        with patch.object(resource, "batch_write_item", return_requestitems_as_unprocessed):
+            e_resource = EncryptedResource(
+                resource=resource, materials_provider=materials_provider, attribute_actions=initial_actions
+            )
+
+            await batch_write_item_unprocessed_check(
+                encrypted=e_resource, initial_item=initial_item, write_transformer=dict_to_ddb, table_name=table_name
+            )
+
+
+async def client_cycle_single_item_check(
+    materials_provider, initial_actions, initial_item, table_name, region_name=None
+):
     check_attribute_actions = initial_actions.copy()
     check_attribute_actions.set_index_keys(*list(TEST_KEY.keys()))
     item = initial_item.copy()
@@ -685,67 +717,63 @@ def client_cycle_single_item_check(materials_provider, initial_actions, initial_
     ddb_item = dict_to_ddb(item)
     ddb_key = dict_to_ddb(TEST_KEY)
 
-    kwargs = {}
-    if region_name is not None:
-        kwargs["region_name"] = region_name
-    client = boto3.client("dynamodb", **kwargs)
-    e_client = EncryptedClient(client=client, materials_provider=materials_provider, attribute_actions=initial_actions)
-
-    _put_result = e_client.put_item(TableName=table_name, Item=ddb_item)  # noqa
-
-    encrypted_result = client.get_item(TableName=table_name, Key=ddb_key, ConsistentRead=True)
-    check_encrypted_item(item, ddb_to_dict(encrypted_result["Item"]), check_attribute_actions)
-
-    decrypted_result = e_client.get_item(TableName=table_name, Key=ddb_key, ConsistentRead=True)
-    assert ddb_to_dict(decrypted_result["Item"]) == item
-
-    e_client.delete_item(TableName=table_name, Key=ddb_key)
-    del item
-    del check_attribute_actions
-
-
-def client_cycle_batch_items_check(materials_provider, initial_actions, initial_item, table_name, region_name=None):
-    kwargs = {}
-    if region_name is not None:
-        kwargs["region_name"] = region_name
-    client = boto3.client("dynamodb", **kwargs)
-    e_client = EncryptedClient(client=client, materials_provider=materials_provider, attribute_actions=initial_actions)
-
-    cycle_batch_item_check(
-        raw=client,
-        encrypted=e_client,
-        initial_actions=initial_actions,
-        initial_item=initial_item,
-        write_transformer=dict_to_ddb,
-        read_transformer=ddb_to_dict,
-        table_name=table_name,
-    )
-
-    raw_scan_result = client.scan(TableName=table_name, ConsistentRead=True)
-    e_scan_result = e_client.scan(TableName=table_name, ConsistentRead=True)
-    assert not raw_scan_result["Items"]
-    assert not e_scan_result["Items"]
-
-
-def client_batch_items_unprocessed_check(
-    materials_provider, initial_actions, initial_item, table_name, region_name=None
-):
-    kwargs = {}
-    if region_name is not None:
-        kwargs["region_name"] = region_name
-    client = boto3.client("dynamodb", **kwargs)
-
-    with patch.object(client, "batch_write_item", return_requestitems_as_unprocessed):
+    async with _session().client("dynamodb", **_client_kwargs(region_name)) as client:
         e_client = EncryptedClient(
             client=client, materials_provider=materials_provider, attribute_actions=initial_actions
         )
 
-        batch_write_item_unprocessed_check(
-            encrypted=e_client, initial_item=initial_item, write_transformer=dict_to_ddb, table_name=table_name
+        _put_result = await e_client.put_item(TableName=table_name, Item=ddb_item)  # noqa
+
+        encrypted_result = await client.get_item(TableName=table_name, Key=ddb_key, ConsistentRead=True)
+        check_encrypted_item(item, ddb_to_dict(encrypted_result["Item"]), check_attribute_actions)
+
+        decrypted_result = await e_client.get_item(TableName=table_name, Key=ddb_key, ConsistentRead=True)
+        assert ddb_to_dict(decrypted_result["Item"]) == item
+
+        await e_client.delete_item(TableName=table_name, Key=ddb_key)
+    del item
+    del check_attribute_actions
+
+
+async def client_cycle_batch_items_check(
+    materials_provider, initial_actions, initial_item, table_name, region_name=None
+):
+    async with _session().client("dynamodb", **_client_kwargs(region_name)) as client:
+        e_client = EncryptedClient(
+            client=client, materials_provider=materials_provider, attribute_actions=initial_actions
         )
 
+        await cycle_batch_item_check(
+            raw=client,
+            encrypted=e_client,
+            initial_actions=initial_actions,
+            initial_item=initial_item,
+            write_transformer=dict_to_ddb,
+            read_transformer=ddb_to_dict,
+            table_name=table_name,
+        )
 
-def client_cycle_batch_items_check_scan_paginator(
+        raw_scan_result = await client.scan(TableName=table_name, ConsistentRead=True)
+        e_scan_result = await e_client.scan(TableName=table_name, ConsistentRead=True)
+        assert not raw_scan_result["Items"]
+        assert not e_scan_result["Items"]
+
+
+async def client_batch_items_unprocessed_check(
+    materials_provider, initial_actions, initial_item, table_name, region_name=None
+):
+    async with _session().client("dynamodb", **_client_kwargs(region_name)) as client:
+        with patch.object(client, "batch_write_item", return_requestitems_as_unprocessed):
+            e_client = EncryptedClient(
+                client=client, materials_provider=materials_provider, attribute_actions=initial_actions
+            )
+
+            await batch_write_item_unprocessed_check(
+                encrypted=e_client, initial_item=initial_item, write_transformer=dict_to_ddb, table_name=table_name
+            )
+
+
+async def client_cycle_batch_items_check_scan_paginator(
     materials_provider, initial_actions, initial_item, table_name, region_name=None
 ):
     """Helper function for testing the "scan" paginator.
@@ -756,150 +784,49 @@ def client_cycle_batch_items_check_scan_paginator(
     then verify that all items appear to have been encrypted correctly.
     """  # noqa=D401
     # pylint: disable=too-many-locals
-    kwargs = {}
-    if region_name is not None:
-        kwargs["region_name"] = region_name
-    client = boto3.client("dynamodb", **kwargs)
-    e_client = EncryptedClient(client=client, materials_provider=materials_provider, attribute_actions=initial_actions)
-
-    items_in_table = cycle_batch_item_check(
-        raw=client,
-        encrypted=e_client,
-        initial_actions=initial_actions,
-        initial_item=initial_item,
-        write_transformer=dict_to_ddb,
-        read_transformer=ddb_to_dict,
-        table_name=table_name,
-        delete_items=False,
-    )
-
-    try:
-        encrypted_items = []
-        raw_paginator = client.get_paginator("scan")
-        for page in raw_paginator.paginate(TableName=table_name, ConsistentRead=True):
-            encrypted_items.extend(page["Items"])
-
-        decrypted_items = []
-        encrypted_paginator = e_client.get_paginator("scan")
-        for page in encrypted_paginator.paginate(TableName=table_name, ConsistentRead=True):
-            decrypted_items.extend(page["Items"])
-
-        assert encrypted_items and decrypted_items
-        assert len(encrypted_items) == len(decrypted_items) == items_in_table
-
-        check_attribute_actions = initial_actions.copy()
-        check_attribute_actions.set_index_keys(*list(TEST_KEY.keys()))
-        check_many_encrypted_items(
-            actual=encrypted_items,
-            expected=decrypted_items,
-            attribute_actions=check_attribute_actions,
-            transformer=ddb_to_dict,
+    async with _session().client("dynamodb", **_client_kwargs(region_name)) as client:
+        e_client = EncryptedClient(
+            client=client, materials_provider=materials_provider, attribute_actions=initial_actions
         )
 
-    finally:
-        _cleanup_items(encrypted=e_client, write_transformer=dict_to_ddb, table_name=table_name)
+        items_in_table = await cycle_batch_item_check(
+            raw=client,
+            encrypted=e_client,
+            initial_actions=initial_actions,
+            initial_item=initial_item,
+            write_transformer=dict_to_ddb,
+            read_transformer=ddb_to_dict,
+            table_name=table_name,
+            delete_items=False,
+        )
 
-    raw_scan_result = client.scan(TableName=table_name, ConsistentRead=True)
-    e_scan_result = e_client.scan(TableName=table_name, ConsistentRead=True)
-    assert not raw_scan_result["Items"]
-    assert not e_scan_result["Items"]
+        try:
+            encrypted_items = []
+            raw_paginator = client.get_paginator("scan")
+            async for page in raw_paginator.paginate(TableName=table_name, ConsistentRead=True):
+                encrypted_items.extend(page["Items"])
 
+            decrypted_items = []
+            encrypted_paginator = e_client.get_paginator("scan")
+            async for page in encrypted_paginator.paginate(TableName=table_name, ConsistentRead=True):
+                decrypted_items.extend(page["Items"])
 
-def build_metastore():
-    client = boto3.client("dynamodb", region_name=TEST_REGION_NAME)
-    table_name = base64.urlsafe_b64encode(os.urandom(32)).decode("utf-8").replace("=", ".")
+            assert encrypted_items and decrypted_items
+            assert len(encrypted_items) == len(decrypted_items) == items_in_table
 
-    MetaStore.create_table(client, table_name, 1, 1)
-    waiter = client.get_waiter("table_exists")
-    waiter.wait(TableName=table_name)
+            check_attribute_actions = initial_actions.copy()
+            check_attribute_actions.set_index_keys(*list(TEST_KEY.keys()))
+            check_many_encrypted_items(
+                actual=encrypted_items,
+                expected=decrypted_items,
+                attribute_actions=check_attribute_actions,
+                transformer=ddb_to_dict,
+            )
 
-    table = boto3.resource("dynamodb", region_name=TEST_REGION_NAME).Table(table_name)
-    return MetaStore(table, build_static_jce_cmp("AES", 256, "HmacSHA256", 256)), table_name
+        finally:
+            await _cleanup_items(encrypted=e_client, write_transformer=dict_to_ddb, table_name=table_name)
 
-
-def delete_metastore(table_name):
-    client = boto3.client("dynamodb", region_name=TEST_REGION_NAME)
-    client.delete_table(TableName=table_name)
-    # It sometimes takes a long time to delete a table.
-    # If hanging, asynchronously deleting tables becomes an issue,
-    # come back to this.
-    # Otherwise, let's just let them take care of themselves.
-    # waiter = client.get_waiter("table_not_exists")
-    # waiter.wait(TableName=table_name)
-
-
-@pytest.fixture
-def mock_metastore():
-    with mock_dynamodb2():
-        metastore, table_name = build_metastore()
-        yield metastore
-        delete_metastore(table_name)
-
-
-def _count_entries(records, *messages):
-    count = 0
-
-    for record in records:
-        if all((message in record.getMessage() for message in messages)):
-            count += 1
-
-    return count
-
-
-def _count_puts(records, table_name):
-    return _count_entries(records, '"TableName": "{}"'.format(table_name), "OperationModel(name=PutItem)")
-
-
-def _count_gets(records, table_name):
-    return _count_entries(records, '"TableName": "{}"'.format(table_name), "OperationModel(name=GetItem)")
-
-
-def check_metastore_cache_use_encrypt(metastore, table_name, log_capture):
-    try:
-        table = boto3.resource("dynamodb").Table(table_name)
-    except NoRegionError:
-        table = boto3.resource("dynamodb", region_name=TEST_REGION_NAME).Table(table_name)
-
-    most_recent_provider = CachingMostRecentProvider(provider_store=metastore, material_name="test", version_ttl=600.0)
-    e_table = EncryptedTable(table=table, materials_provider=most_recent_provider)
-
-    item = diverse_item()
-    item.update(TEST_KEY)
-    e_table.put_item(Item=item)
-    e_table.put_item(Item=item)
-    e_table.put_item(Item=item)
-    e_table.put_item(Item=item)
-
-    try:
-        primary_puts = _count_puts(log_capture.records, e_table.name)
-        metastore_puts = _count_puts(log_capture.records, metastore._table.name)
-
-        assert primary_puts == 4
-        assert metastore_puts == 1
-
-        e_table.get_item(Key=TEST_KEY)
-        e_table.get_item(Key=TEST_KEY)
-        e_table.get_item(Key=TEST_KEY)
-
-        primary_gets = _count_gets(log_capture.records, e_table.name)
-        metastore_gets = _count_gets(log_capture.records, metastore._table.name)
-        metastore_puts = _count_puts(log_capture.records, metastore._table.name)
-
-        assert primary_gets == 3
-        assert metastore_gets == 0
-        assert metastore_puts == 1
-
-        most_recent_provider.refresh()
-
-        e_table.get_item(Key=TEST_KEY)
-        e_table.get_item(Key=TEST_KEY)
-        e_table.get_item(Key=TEST_KEY)
-
-        primary_gets = _count_gets(log_capture.records, e_table.name)
-        metastore_gets = _count_gets(log_capture.records, metastore._table.name)
-
-        assert primary_gets == 6
-        assert metastore_gets == 1
-
-    finally:
-        e_table.delete_item(Key=TEST_KEY)
+        raw_scan_result = await client.scan(TableName=table_name, ConsistentRead=True)
+        e_scan_result = await e_client.scan(TableName=table_name, ConsistentRead=True)
+        assert not raw_scan_result["Items"]
+        assert not e_scan_result["Items"]

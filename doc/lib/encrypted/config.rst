@@ -1,4 +1,4 @@
 Cryptographic Configuration
 ---------------------------
 
-.. automodule:: dynamodb_encryption_sdk.encrypted
+.. automodule:: dynamodb_encryption_sdk_async.encrypted

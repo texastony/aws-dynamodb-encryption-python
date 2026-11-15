@@ -13,7 +13,7 @@
 """Functional tests for material description de/serialization."""
 import pytest
 
-from dynamodb_encryption_sdk.internal.crypto.authentication import _string_to_sign
+from dynamodb_encryption_sdk_async.internal.crypto.authentication import _string_to_sign
 
 from ...functional_test_vector_generators import string_to_sign_test_vectors
 

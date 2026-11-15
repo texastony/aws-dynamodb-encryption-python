@@ -19,8 +19,8 @@ from decimal import Decimal
 
 from boto3.dynamodb.types import Binary
 
-from dynamodb_encryption_sdk.identifiers import CryptoAction
-from dynamodb_encryption_sdk.structures import AttributeActions
+from dynamodb_encryption_sdk_async.identifiers import CryptoAction
+from dynamodb_encryption_sdk_async.structures import AttributeActions
 
 _ATTRIBUTE_TEST_VECTOR_FILE_TEMPLATE = os.path.join(
     os.path.abspath(os.path.dirname(__file__)), "..", "vectors", "{mode}_attribute.json"

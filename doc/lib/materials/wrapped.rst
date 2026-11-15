@@ -1,4 +1,4 @@
 Wrapped Cryptographic Materials
 -------------------------------
 
-.. automodule:: dynamodb_encryption_sdk.materials.wrapped
+.. automodule:: dynamodb_encryption_sdk_async.materials.wrapped

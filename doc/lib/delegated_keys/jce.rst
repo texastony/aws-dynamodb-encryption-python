@@ -1,4 +1,4 @@
 JCE Standard Name Delegated Key
 -------------------------------
 
-.. automodule:: dynamodb_encryption_sdk.delegated_keys.jce
+.. automodule:: dynamodb_encryption_sdk_async.delegated_keys.jce

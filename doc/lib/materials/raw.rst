@@ -1,4 +1,4 @@
 Raw Cryptographic Materials
 ---------------------------
 
-.. automodule:: dynamodb_encryption_sdk.materials.raw
+.. automodule:: dynamodb_encryption_sdk_async.materials.raw

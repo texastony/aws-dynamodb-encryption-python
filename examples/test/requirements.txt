@@ -1,2 +1,3 @@
-dynamodb-encryption-sdk
+dynamodb-encryption-sdk-async
 pytest
+pytest-asyncio

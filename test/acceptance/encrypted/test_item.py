@@ -10,20 +10,19 @@
 # distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF
 # ANY KIND, either express or implied. See the License for the specific
 # language governing permissions and limitations under the License.
-"""Acceptance tests for ``dynamodb_encryption_sdk.encrypted.item``."""
+"""Acceptance tests for ``dynamodb_encryption_sdk_async.encrypted.item``."""
 import pytest
-from moto import mock_dynamodb2
 
-from dynamodb_encryption_sdk.encrypted import CryptoConfig
-from dynamodb_encryption_sdk.encrypted.item import decrypt_dynamodb_item
-from dynamodb_encryption_sdk.structures import EncryptionContext
+from dynamodb_encryption_sdk_async.encrypted import CryptoConfig
+from dynamodb_encryption_sdk_async.encrypted.item import decrypt_dynamodb_item
+from dynamodb_encryption_sdk_async.structures import EncryptionContext
 
 from ..acceptance_test_utils import load_scenarios
 
 pytestmark = [pytest.mark.accept]
 
 
-def _item_check(materials_provider, table_name, table_index, ciphertext_item, plaintext_item, attribute_actions):
+async def _item_check(materials_provider, table_name, table_index, ciphertext_item, plaintext_item, attribute_actions):
     cmp = materials_provider()  # Some of the materials providers need to be constructed inside the test
     encryption_context = EncryptionContext(
         table_name=table_name,
@@ -34,7 +33,7 @@ def _item_check(materials_provider, table_name, table_index, ciphertext_item, pl
     crypto_config = CryptoConfig(
         materials_provider=cmp, encryption_context=encryption_context, attribute_actions=attribute_actions
     )
-    decrypted_item = decrypt_dynamodb_item(ciphertext_item.copy(), crypto_config)
+    decrypted_item = await decrypt_dynamodb_item(ciphertext_item.copy(), crypto_config)
     assert set(decrypted_item.keys()) == set(plaintext_item.keys())
     for key in decrypted_item:
         if key == "version":
@@ -42,42 +41,9 @@ def _item_check(materials_provider, table_name, table_index, ciphertext_item, pl
         assert decrypted_item[key] == plaintext_item[key]
 
 
-@mock_dynamodb2
 @pytest.mark.local
-@pytest.mark.parametrize(
-    "materials_provider, table_name, table_index, ciphertext_item, plaintext_item, attribute_actions, prep",
-    load_scenarios(online=False),
-)
-def test_item_encryptor_offline(
-    materials_provider, table_name, table_index, ciphertext_item, plaintext_item, attribute_actions, prep
+@pytest.mark.parametrize("materials_provider, table_name, table_index, ciphertext_item, plaintext_item, attribute_actions", load_scenarios(online=False))
+async def test_item_encryptor_offline(
+    materials_provider, table_name, table_index, ciphertext_item, plaintext_item, attribute_actions
 ):
-    metatable = None
-    try:
-        metatable = prep()
-        return _item_check(
-            materials_provider, table_name, table_index, ciphertext_item, plaintext_item, attribute_actions
-        )
-    finally:
-        if metatable:
-            metatable.delete()
-            metatable.wait_until_not_exists()
-
-
-@pytest.mark.ddb_integ
-@pytest.mark.parametrize(
-    "materials_provider, table_name, table_index, ciphertext_item, plaintext_item, attribute_actions, prep",
-    load_scenarios(online=True),
-)
-def test_item_encryptor_online(
-    materials_provider, table_name, table_index, ciphertext_item, plaintext_item, attribute_actions, prep
-):
-    metatable = None
-    try:
-        metatable = prep()
-        return _item_check(
-            materials_provider, table_name, table_index, ciphertext_item, plaintext_item, attribute_actions
-        )
-    finally:
-        if metatable:
-            metatable.delete()
-            metatable.wait_until_not_exists()
+    await _item_check(materials_provider, table_name, table_index, ciphertext_item, plaintext_item, attribute_actions)

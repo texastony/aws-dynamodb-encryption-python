@@ -10,10 +10,10 @@
 # distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF
 # ANY KIND, either express or implied. See the License for the specific
 # language governing permissions and limitations under the License.
-"""Unit test for ``dynamodb_encryption_sdk.material_providers``."""
+"""Unit test for ``dynamodb_encryption_sdk_async.material_providers``."""
 import pytest
 
-from dynamodb_encryption_sdk.material_providers import CryptographicMaterialsProvider
+from dynamodb_encryption_sdk_async.material_providers import CryptographicMaterialsProvider
 
 pytestmark = [pytest.mark.unit, pytest.mark.local]
 

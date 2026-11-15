@@ -12,13 +12,13 @@
 # language governing permissions and limitations under the License.
 """De/serialization unit tests.
 
-Tests for ``dynamodb_encryption_sdk.internal.formatting.serialize.attribute``
-and ``dynamodb_encryption_sdk.internal.formatting.deserialize.attribute``.
+Tests for ``dynamodb_encryption_sdk_async.internal.formatting.serialize.attribute``
+and ``dynamodb_encryption_sdk_async.internal.formatting.deserialize.attribute``.
 """
 import pytest
 
-from dynamodb_encryption_sdk.internal.formatting.serialize.attribute import _sorted_key_map
-from dynamodb_encryption_sdk.internal.str_ops import to_bytes
+from dynamodb_encryption_sdk_async.internal.formatting.serialize.attribute import _sorted_key_map
+from dynamodb_encryption_sdk_async.internal.str_ops import to_bytes
 
 pytestmark = [pytest.mark.unit, pytest.mark.local]
 

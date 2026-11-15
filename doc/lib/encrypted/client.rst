@@ -1,4 +1,4 @@
 Encrypted Client
 ----------------
 
-.. automodule:: dynamodb_encryption_sdk.encrypted.client
+.. automodule:: dynamodb_encryption_sdk_async.encrypted.client

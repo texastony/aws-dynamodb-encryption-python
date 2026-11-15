@@ -1,4 +1,4 @@
 Structures
 ----------
 
-.. automodule:: dynamodb_encryption_sdk.structures
+.. automodule:: dynamodb_encryption_sdk_async.structures
