@@ -16,12 +16,14 @@
     No guarantee is provided on the modules and APIs within this
     namespace staying consistent. Directly reference at your own risk.
 """
+import asyncio
 import copy
+import inspect
 from functools import partial
-from typing import Any, Callable, Dict, Iterable, Text
+from typing import Any, AsyncIterator, Callable, Dict, Iterable, Text
 
 import attr
-import botocore.client
+from aiobotocore.client import AioBaseClient
 
 from dynamodb_encryption_sdk.encrypted import CryptoConfig
 from dynamodb_encryption_sdk.encrypted.item import decrypt_python_item, encrypt_python_item
@@ -49,17 +51,17 @@ class TableInfoCache(object):
     # pylint: disable=too-few-public-methods
     """Very simple cache of TableInfo objects, providing configuration information about DynamoDB tables.
 
-    :param client: Boto3 DynamoDB client
-    :type client: botocore.client.BaseClient
+    :param client: aiobotocore DynamoDB client
+    :type client: aiobotocore.client.AioBaseClient
     :param bool auto_refresh_table_indexes: Should we attempt to refresh information about table indexes?
         Requires ``dynamodb:DescribeTable`` permissions on each table.
     """
 
-    _client = attr.ib(validator=attr.validators.instance_of(botocore.client.BaseClient))
+    _client = attr.ib(validator=attr.validators.instance_of(AioBaseClient))
     _auto_refresh_table_indexes = attr.ib(validator=attr.validators.instance_of(bool))
 
     def __init__(self, client, auto_refresh_table_indexes):  # noqa=D107
-        # type: (botocore.client.BaseClient, bool) -> None
+        # type: (AioBaseClient, bool) -> None
         # Workaround pending resolution of attrs/mypy interaction.
         # https://github.com/python/mypy/issues/2088
         # https://github.com/python-attrs/attrs/issues/215
@@ -71,8 +73,11 @@ class TableInfoCache(object):
     def __attrs_post_init__(self):
         """Set up the empty cache."""
         self._all_tables_info = {}  # type: Dict[Text, TableInfo]  # pylint: disable=attribute-defined-outside-init
+        # In-flight loads, so concurrent first lookups of a table share one DescribeTable.
+        # The futures belong to the running event loop: use a cache from one loop only.
+        self._pending = {}  # type: Dict[Text, asyncio.Future]  # pylint: disable=attribute-defined-outside-init
 
-    def table_info(self, table_name):
+    async def table_info(self, table_name):
         """Collect a TableInfo object for the specified table, creating and adding it to
         the cache if not already present.
 
@@ -83,11 +88,23 @@ class TableInfoCache(object):
         try:
             return self._all_tables_info[table_name]
         except KeyError:
+            pass
+        pending = self._pending.get(table_name)
+        if pending is None:
+            pending = asyncio.ensure_future(self._load_table_info(table_name))
+            self._pending[table_name] = pending
+        # Shield: one waiter being cancelled must not cancel the load the others wait on.
+        return await asyncio.shield(pending)
+
+    async def _load_table_info(self, table_name):
+        try:
             _table_info = TableInfo(name=table_name)
             if self._auto_refresh_table_indexes:
-                _table_info.refresh_indexed_attributes(self._client)
+                await _table_info.refresh_indexed_attributes(self._client)
             self._all_tables_info[table_name] = _table_info
             return _table_info
+        finally:
+            self._pending.pop(table_name, None)
 
 
 def validate_get_arguments(kwargs):
@@ -104,7 +121,7 @@ def validate_get_arguments(kwargs):
         raise InvalidArgumentError('Scan "Select" value of "{}" is not supported'.format(kwargs["Select"]))
 
 
-def crypto_config_from_kwargs(fallback, **kwargs):
+async def crypto_config_from_kwargs(fallback, **kwargs):
     """Pull all encryption-specific parameters from the request and use them to build a crypto config.
 
     :returns: crypto config and updated kwargs
@@ -118,6 +135,8 @@ def crypto_config_from_kwargs(fallback, **kwargs):
         except KeyError:
             fallback_kwargs = {}
         crypto_config = fallback(**fallback_kwargs)
+        if inspect.isawaitable(crypto_config):
+            crypto_config = await crypto_config
     return crypto_config, kwargs
 
 
@@ -140,13 +159,13 @@ def crypto_config_from_table_info(materials_provider, attribute_actions, table_i
     )
 
 
-def crypto_config_from_cache(materials_provider, attribute_actions, table_info_cache, table_name):
+async def crypto_config_from_cache(materials_provider, attribute_actions, table_info_cache, table_name):
     """Build a crypto config from the provided values, loading the table info from the provided cache.
 
     :returns: crypto config and updated kwargs
     :rtype: tuple(CryptoConfig, dict)
     """
-    table_info = table_info_cache.table_info(table_name)
+    table_info = await table_info_cache.table_info(table_name)
 
     attribute_actions = attribute_actions.copy()
     attribute_actions.set_index_keys(*table_info.protected_index_keys())
@@ -167,8 +186,8 @@ def _item_transformer(crypto_transformer):
     return lambda x: x
 
 
-def decrypt_list_of_items(crypto_config, decrypt_method, items):
-    # type: (CryptoConfig, Callable, Iterable[Any]) -> Iterable[Any]
+async def decrypt_list_of_items(crypto_config, decrypt_method, items):
+    # type: (CryptoConfig, Callable, Iterable[Any]) -> AsyncIterator[Any]
     # narrow this down
     # https://github.com/aws/aws-dynamodb-encryption-python/issues/66
     """Iterate through a list of encrypted items, decrypting each item and yielding the plaintext item.
@@ -176,15 +195,15 @@ def decrypt_list_of_items(crypto_config, decrypt_method, items):
     :param CryptoConfig crypto_config: :class:`CryptoConfig` to use
     :param callable decrypt_method: Method to use to decrypt items
     :param items: Iterable of encrypted items
-    :return: Iterable of plaintext items
+    :return: Async iterator of plaintext items
     """
     for value in items:
-        yield decrypt_method(
+        yield await decrypt_method(
             item=value, crypto_config=crypto_config.with_item(_item_transformer(decrypt_method)(value))
         )
 
 
-def decrypt_multi_get(decrypt_method, crypto_config_method, read_method, **kwargs):
+async def decrypt_multi_get(decrypt_method, crypto_config_method, read_method, **kwargs):
     # type: (Callable, Callable, Callable, **Any) -> Dict
     # narrow this down
     # https://github.com/aws/aws-dynamodb-encryption-python/issues/66
@@ -198,15 +217,18 @@ def decrypt_multi_get(decrypt_method, crypto_config_method, read_method, **kwarg
     :rtype: dict
     """
     validate_get_arguments(kwargs)
-    crypto_config, ddb_kwargs = crypto_config_method(**kwargs)
-    response = read_method(**ddb_kwargs)
-    response["Items"] = list(
-        decrypt_list_of_items(crypto_config=crypto_config, decrypt_method=decrypt_method, items=response["Items"])
-    )
+    crypto_config, ddb_kwargs = await crypto_config_method(**kwargs)
+    response = await read_method(**ddb_kwargs)
+    response["Items"] = [
+        item
+        async for item in decrypt_list_of_items(
+            crypto_config=crypto_config, decrypt_method=decrypt_method, items=response["Items"]
+        )
+    ]
     return response
 
 
-def decrypt_get_item(decrypt_method, crypto_config_method, read_method, **kwargs):
+async def decrypt_get_item(decrypt_method, crypto_config_method, read_method, **kwargs):
     # type: (Callable, Callable, Callable, **Any) -> Dict
     # narrow this down
     # https://github.com/aws/aws-dynamodb-encryption-python/issues/66
@@ -220,17 +242,17 @@ def decrypt_get_item(decrypt_method, crypto_config_method, read_method, **kwargs
     :rtype: dict
     """
     validate_get_arguments(kwargs)
-    crypto_config, ddb_kwargs = crypto_config_method(**kwargs)
-    response = read_method(**ddb_kwargs)
+    crypto_config, ddb_kwargs = await crypto_config_method(**kwargs)
+    response = await read_method(**ddb_kwargs)
     if "Item" in response:
-        response["Item"] = decrypt_method(
+        response["Item"] = await decrypt_method(
             item=response["Item"],
             crypto_config=crypto_config.with_item(_item_transformer(decrypt_method)(response["Item"])),
         )
     return response
 
 
-def decrypt_batch_get_item(decrypt_method, crypto_config_method, read_method, **kwargs):
+async def decrypt_batch_get_item(decrypt_method, crypto_config_method, read_method, **kwargs):
     # type: (Callable, Callable, Callable, **Any) -> Dict
     # narrow this down
     # https://github.com/aws/aws-dynamodb-encryption-python/issues/66
@@ -248,21 +270,21 @@ def decrypt_batch_get_item(decrypt_method, crypto_config_method, read_method, **
     for _table_name, table_kwargs in kwargs["RequestItems"].items():
         validate_get_arguments(table_kwargs)
 
-    response = read_method(**kwargs)
+    response = await read_method(**kwargs)
     for table_name, items in response["Responses"].items():
         if request_crypto_config is not None:
             crypto_config = request_crypto_config
         else:
-            crypto_config = crypto_config_method(table_name=table_name)
+            crypto_config = await crypto_config_method(table_name=table_name)
 
         for pos, value in enumerate(items):
-            items[pos] = decrypt_method(
+            items[pos] = await decrypt_method(
                 item=value, crypto_config=crypto_config.with_item(_item_transformer(decrypt_method)(items[pos]))
             )
     return response
 
 
-def encrypt_put_item(encrypt_method, crypto_config_method, write_method, **kwargs):
+async def encrypt_put_item(encrypt_method, crypto_config_method, write_method, **kwargs):
     # type: (Callable, Callable, Callable, **Any) -> Dict
     # narrow this down
     # https://github.com/aws/aws-dynamodb-encryption-python/issues/66
@@ -275,15 +297,15 @@ def encrypt_put_item(encrypt_method, crypto_config_method, write_method, **kwarg
     :return: DynamoDB response
     :rtype: dict
     """
-    crypto_config, ddb_kwargs = crypto_config_method(**kwargs)
-    ddb_kwargs["Item"] = encrypt_method(
+    crypto_config, ddb_kwargs = await crypto_config_method(**kwargs)
+    ddb_kwargs["Item"] = await encrypt_method(
         item=ddb_kwargs["Item"],
         crypto_config=crypto_config.with_item(_item_transformer(encrypt_method)(ddb_kwargs["Item"])),
     )
-    return write_method(**ddb_kwargs)
+    return await write_method(**ddb_kwargs)
 
 
-def encrypt_batch_write_item(encrypt_method, crypto_config_method, write_method, **kwargs):
+async def encrypt_batch_write_item(encrypt_method, crypto_config_method, write_method, **kwargs):
     # type: (Callable, Callable, Callable, **Any) -> Dict
     # narrow this down
     # https://github.com/aws/aws-dynamodb-encryption-python/issues/66
@@ -304,19 +326,19 @@ def encrypt_batch_write_item(encrypt_method, crypto_config_method, write_method,
         if request_crypto_config is not None:
             crypto_config = request_crypto_config
         else:
-            crypto_config = crypto_config_method(table_name=table_name)
+            crypto_config = await crypto_config_method(table_name=table_name)
         table_crypto_configs[table_name] = crypto_config
 
         for pos, value in enumerate(items):
             for request_type, item in value.items():
                 # We don't encrypt primary indexes, so we can ignore DeleteItem requests
                 if request_type == "PutRequest":
-                    items[pos][request_type]["Item"] = encrypt_method(
+                    items[pos][request_type]["Item"] = await encrypt_method(
                         item=item["Item"],
                         crypto_config=crypto_config.with_item(_item_transformer(encrypt_method)(item["Item"])),
                     )
 
-    response = write_method(**kwargs)
+    response = await write_method(**kwargs)
     return _process_batch_write_response(plaintext_items, response, table_crypto_configs)
 
 

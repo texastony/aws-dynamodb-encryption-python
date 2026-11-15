@@ -329,13 +329,13 @@ class TableInfo(object):
             )
         return values
 
-    def refresh_indexed_attributes(self, client):
+    async def refresh_indexed_attributes(self, client):
         """Use the provided boto3 DynamoDB client to determine all indexes for this table.
 
         :param client: Pre-configured boto3 DynamoDB client
-        :type client: botocore.client.BaseClient
+        :type client: aiobotocore.client.AioBaseClient
         """
-        table = client.describe_table(TableName=self.name)["Table"]
+        table = (await client.describe_table(TableName=self.name))["Table"]
         self._primary_index = TableIndex.from_key_schema(table["KeySchema"])
 
         self._secondary_indexes = []

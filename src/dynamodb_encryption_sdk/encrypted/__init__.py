@@ -71,23 +71,23 @@ class CryptoConfig(object):
             if self.attribute_actions.action(self.encryption_context.sort_key_name) is CryptoAction.ENCRYPT_AND_SIGN:
                 raise InvalidArgumentError("Cannot encrypt sort key")
 
-    def decryption_materials(self):
+    async def decryption_materials(self):
         # type: () -> CryptographicMaterials
         """Load decryption materials from instance resources.
 
         :returns: Decryption materials
         :rtype: CryptographicMaterials
         """
-        return self.materials_provider.decryption_materials(self.encryption_context)
+        return await self.materials_provider.decryption_materials(self.encryption_context)
 
-    def encryption_materials(self):
+    async def encryption_materials(self):
         # type: () -> CryptographicMaterials
         """Load encryption materials from instance resources.
 
         :returns: Encryption materials
         :rtype: CryptographicMaterials
         """
-        return self.materials_provider.encryption_materials(self.encryption_context)
+        return await self.materials_provider.encryption_materials(self.encryption_context)
 
     def copy(self):
         # type: () -> CryptoConfig

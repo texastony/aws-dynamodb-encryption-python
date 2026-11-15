@@ -92,7 +92,7 @@ class WrappedCryptographicMaterialsProvider(CryptographicMaterialsProvider):
             material_description=material_description,
         )
 
-    def encryption_materials(self, encryption_context):
+    async def encryption_materials(self, encryption_context):
         # type: (EncryptionContext) -> WrappedCryptographicMaterials
         """Provide encryption materials.
 
@@ -106,7 +106,7 @@ class WrappedCryptographicMaterialsProvider(CryptographicMaterialsProvider):
 
         return self._build_materials(encryption_context)
 
-    def decryption_materials(self, encryption_context):
+    async def decryption_materials(self, encryption_context):
         # type: (EncryptionContext) -> WrappedCryptographicMaterials
         """Provide decryption materials.
 

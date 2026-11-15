@@ -52,7 +52,7 @@ class StaticCryptographicMaterialsProvider(CryptographicMaterialsProvider):
         self._encryption_materials = encryption_materials
         attr.validate(self)
 
-    def decryption_materials(self, encryption_context):
+    async def decryption_materials(self, encryption_context):
         # type: (EncryptionContext) -> CryptographicMaterials
         """Return the static decryption materials.
 
@@ -61,11 +61,11 @@ class StaticCryptographicMaterialsProvider(CryptographicMaterialsProvider):
         :raises AttributeError: if no decryption materials are available
         """
         if self._decryption_materials is None:
-            return super(StaticCryptographicMaterialsProvider, self).decryption_materials(encryption_context)
+            return await super().decryption_materials(encryption_context)
 
         return self._decryption_materials
 
-    def encryption_materials(self, encryption_context):
+    async def encryption_materials(self, encryption_context):
         # type: (EncryptionContext) -> CryptographicMaterials
         """Return the static encryption materials.
 
@@ -74,6 +74,6 @@ class StaticCryptographicMaterialsProvider(CryptographicMaterialsProvider):
         :raises AttributeError: if no encryption materials are available
         """
         if self._encryption_materials is None:
-            return super(StaticCryptographicMaterialsProvider, self).encryption_materials(encryption_context)
+            return await super().encryption_materials(encryption_context)
 
         return self._encryption_materials

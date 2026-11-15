@@ -32,7 +32,7 @@ from . import CryptoConfig  # noqa pylint: disable=unused-import
 __all__ = ("encrypt_dynamodb_item", "encrypt_python_item", "decrypt_dynamodb_item", "decrypt_python_item")
 
 
-def encrypt_dynamodb_item(item, crypto_config):
+async def encrypt_dynamodb_item(item, crypto_config):
     # type: (dynamodb_types.ITEM, CryptoConfig) -> dynamodb_types.ITEM
     """Encrypt a DynamoDB item.
 
@@ -41,7 +41,7 @@ def encrypt_dynamodb_item(item, crypto_config):
     ...     'some': {'S': 'data'},
     ...     'more': {'N': '5'}
     ... }
-    >>> encrypted_item = encrypt_dynamodb_item(
+    >>> encrypted_item = await encrypt_dynamodb_item(
     ...     item=plaintext_item,
     ...     crypto_config=my_crypto_config
     ... )
@@ -65,7 +65,7 @@ def encrypt_dynamodb_item(item, crypto_config):
                 'Reserved attribute name "{}" is not allowed in plaintext item.'.format(reserved_name.value)
             )
 
-    encryption_materials = crypto_config.encryption_materials()
+    encryption_materials = await crypto_config.encryption_materials()
 
     inner_material_description = encryption_materials.material_description.copy()
     try:
@@ -114,7 +114,7 @@ def encrypt_dynamodb_item(item, crypto_config):
     return encrypted_item
 
 
-def encrypt_python_item(item, crypto_config):
+async def encrypt_python_item(item, crypto_config):
     # type: (dynamodb_types.ITEM, CryptoConfig) -> dynamodb_types.ITEM
     """Encrypt a dictionary for DynamoDB.
 
@@ -123,7 +123,7 @@ def encrypt_python_item(item, crypto_config):
     ...     'some': 'data',
     ...     'more': 5
     ... }
-    >>> encrypted_item = encrypt_python_item(
+    >>> encrypted_item = await encrypt_python_item(
     ...     item=plaintext_item,
     ...     crypto_config=my_crypto_config
     ... )
@@ -138,11 +138,11 @@ def encrypt_python_item(item, crypto_config):
     :rtype: dict
     """
     ddb_item = dict_to_ddb(item)
-    encrypted_ddb_item = encrypt_dynamodb_item(ddb_item, crypto_config)
+    encrypted_ddb_item = await encrypt_dynamodb_item(ddb_item, crypto_config)
     return ddb_to_dict(encrypted_ddb_item)
 
 
-def decrypt_dynamodb_item(item, crypto_config):
+async def decrypt_dynamodb_item(item, crypto_config):
     # type: (dynamodb_types.ITEM, CryptoConfig) -> dynamodb_types.ITEM
     """Decrypt a DynamoDB item.
 
@@ -151,7 +151,7 @@ def decrypt_dynamodb_item(item, crypto_config):
     ...     'some': {'B': b'ENCRYPTED_DATA'},
     ...     'more': {'B': b'ENCRYPTED_DATA'}
     ... }
-    >>> decrypted_item = decrypt_python_item(
+    >>> decrypted_item = await decrypt_python_item(
     ...     item=encrypted_item,
     ...     crypto_config=my_crypto_config
     ... )
@@ -191,7 +191,7 @@ def decrypt_dynamodb_item(item, crypto_config):
         material_description = deserialize_material_description(material_description_attribute)
         inner_crypto_config.encryption_context.material_description = material_description
 
-    decryption_materials = inner_crypto_config.decryption_materials()
+    decryption_materials = await inner_crypto_config.decryption_materials()
 
     verify_item_signature(signature_attribute, item, decryption_materials.verification_key, inner_crypto_config)
 
@@ -223,7 +223,7 @@ def decrypt_dynamodb_item(item, crypto_config):
     return decrypted_item
 
 
-def decrypt_python_item(item, crypto_config):
+async def decrypt_python_item(item, crypto_config):
     # type: (dynamodb_types.ITEM, CryptoConfig) -> dynamodb_types.ITEM
     """Decrypt a dictionary for DynamoDB.
 
@@ -232,7 +232,7 @@ def decrypt_python_item(item, crypto_config):
     ...     'some': Binary(b'ENCRYPTED_DATA'),
     ...     'more': Binary(b'ENCRYPTED_DATA')
     ... }
-    >>> decrypted_item = decrypt_python_item(
+    >>> decrypted_item = await decrypt_python_item(
     ...     item=encrypted_item,
     ...     crypto_config=my_crypto_config
     ... )
@@ -247,5 +247,5 @@ def decrypt_python_item(item, crypto_config):
     :rtype: dict
     """
     ddb_item = dict_to_ddb(item)
-    decrypted_ddb_item = decrypt_dynamodb_item(ddb_item, crypto_config)
+    decrypted_ddb_item = await decrypt_dynamodb_item(ddb_item, crypto_config)
     return ddb_to_dict(decrypted_ddb_item)

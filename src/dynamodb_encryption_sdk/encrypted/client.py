@@ -12,10 +12,11 @@
 # language governing permissions and limitations under the License.
 """High-level helper class to provide a familiar interface to encrypted tables."""
 from functools import partial
-from typing import Any, Callable, Dict, Iterator, Optional
+from typing import Any, AsyncIterator, Callable, Dict, Optional
 
 import attr
-import botocore
+import botocore.paginate
+from aiobotocore.client import AioBaseClient
 
 from dynamodb_encryption_sdk.internal.utils import (
     TableInfoCache,
@@ -42,8 +43,8 @@ __all__ = ("EncryptedClient", "EncryptedPaginator")
 class EncryptedPaginator(object):
     """Paginator that decrypts returned items before returning them.
 
-    :param paginator: Pre-configured boto3 DynamoDB paginator object
-    :type paginator: botocore.paginate.Paginator
+    :param paginator: Pre-configured aiobotocore DynamoDB paginator object
+    :type paginator: aiobotocore.paginate.AioPaginator
     :param decrypt_method: Item decryptor method from :mod:`dynamodb_encryption_sdk.encrypted.item`
     :param callable crypto_config_method: Callable that returns a :class:`CryptoConfig`
     """
@@ -88,23 +89,27 @@ class EncryptedPaginator(object):
         """
         return getattr(self._paginator, name)
 
-    def paginate(self, **kwargs):
-        # type: (**Any) -> Iterator[Dict]
+    async def paginate(self, **kwargs):
+        # type: (**Any) -> AsyncIterator[Dict]
         # narrow this down
         # https://github.com/aws/aws-dynamodb-encryption-python/issues/66
-        """Create an iterator that will paginate through responses from the underlying paginator,
+        """Create an async iterator that will paginate through responses from the underlying paginator,
         transparently decrypting any returned items.
+
+        >>> async for page in encrypted_client.get_paginator("scan").paginate(TableName="my_table"):
+        ...     print(page["Items"])
         """
         validate_get_arguments(kwargs)
 
-        crypto_config, ddb_kwargs = self._crypto_config_method(**kwargs)
+        crypto_config, ddb_kwargs = await self._crypto_config_method(**kwargs)
 
-        for page in self._paginator.paginate(**ddb_kwargs):
-            page["Items"] = list(
-                decrypt_list_of_items(
+        async for page in self._paginator.paginate(**ddb_kwargs):
+            page["Items"] = [
+                item
+                async for item in decrypt_list_of_items(
                     crypto_config=crypto_config, decrypt_method=self._decrypt_method, items=page["Items"]
                 )
-            )
+            ]
             yield page
 
 
@@ -113,20 +118,18 @@ class EncryptedClient(object):
     # pylint: disable=too-few-public-methods,too-many-instance-attributes
     """High-level helper class to provide a familiar interface to encrypted tables.
 
-    >>> import boto3
+    >>> import aioboto3
     >>> from dynamodb_encryption_sdk.encrypted.client import EncryptedClient
     >>> from dynamodb_encryption_sdk.material_providers.wrapped import WrappedCryptographicMaterialsProvider
-    >>> client = boto3.client('dynamodb')
     >>> wrapped_cmp = WrappedCryptographicMaterialsProvider(signing_key, wrapping_key, unwrapping_key)
-    >>> encrypted_client = EncryptedClient(
-    ...     client=client,
-    ...     materials_provider=wrapped_cmp
-    ... )
+    >>> async with aioboto3.Session().client('dynamodb') as client:
+    ...     encrypted_client = EncryptedClient(client=client, materials_provider=wrapped_cmp)
+    ...     await encrypted_client.put_item(TableName='my_table', Item=item)
 
     .. note::
 
-        This class provides a superset of the boto3 DynamoDB client API, so should work as
-        a drop-in replacement once configured.
+        This class provides a superset of the aiobotocore DynamoDB client API, so should work as
+        a drop-in replacement once configured. Every operation it overrides is a coroutine.
 
         https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/dynamodb.html#client
 
@@ -140,7 +143,7 @@ class EncryptedClient(object):
         We do not currently support the ``update_item`` method.
 
     :param client: Pre-configured boto3 DynamoDB client object
-    :type client: boto3.resources.base.BaseClient
+    :type client: aiobotocore.client.AioBaseClient
     :param CryptographicMaterialsProvider materials_provider: Cryptographic materials provider
         to use
     :param AttributeActions attribute_actions: Table-level configuration of how to encrypt/sign
@@ -152,7 +155,7 @@ class EncryptedClient(object):
         from a service resource or table resource (ex: ``table.meta.client``). (default: False)
     """
 
-    _client = attr.ib(validator=attr.validators.instance_of(botocore.client.BaseClient))
+    _client = attr.ib(validator=attr.validators.instance_of(AioBaseClient))
     _materials_provider = attr.ib(validator=attr.validators.instance_of(CryptographicMaterialsProvider))
     _attribute_actions = attr.ib(
         validator=attr.validators.instance_of(AttributeActions), default=attr.Factory(AttributeActions)
@@ -162,7 +165,7 @@ class EncryptedClient(object):
 
     def __init__(
         self,
-        client,  # type: botocore.client.BaseClient
+        client,  # type: AioBaseClient
         materials_provider,  # type: CryptographicMaterialsProvider
         attribute_actions=None,  # type: Optional[AttributeActions]
         auto_refresh_table_indexes=True,  # type: Optional[bool]

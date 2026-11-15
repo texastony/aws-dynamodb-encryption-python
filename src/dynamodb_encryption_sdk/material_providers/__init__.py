@@ -20,7 +20,7 @@ __all__ = ("CryptographicMaterialsProvider",)
 class CryptographicMaterialsProvider(object):
     """Base class for all cryptographic materials providers."""
 
-    def decryption_materials(self, encryption_context):
+    async def decryption_materials(self, encryption_context):
         # type: (EncryptionContext) -> CryptographicMaterials
         # pylint: disable=unused-argument,no-self-use
         """Return decryption materials.
@@ -30,7 +30,7 @@ class CryptographicMaterialsProvider(object):
         """
         raise AttributeError("No decryption materials available")
 
-    def encryption_materials(self, encryption_context):
+    async def encryption_materials(self, encryption_context):
         # type: (EncryptionContext) -> CryptographicMaterials
         # pylint: disable=unused-argument,no-self-use
         """Return encryption materials.
@@ -40,7 +40,7 @@ class CryptographicMaterialsProvider(object):
         """
         raise AttributeError("No encryption materials available")
 
-    def refresh(self):
+    async def refresh(self):
         # type: () -> None
         # pylint: disable=unused-argument,no-self-use
         """Ask this instance to refresh the cryptographic materials.

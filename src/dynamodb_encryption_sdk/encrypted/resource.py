@@ -40,8 +40,13 @@ class EncryptedTablesCollectionManager(object):
 
     https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/dynamodb/service-resource/tables.html
 
-    :param collection: Pre-configured boto3 DynamoDB table collection manager
-    :type collection: boto3.resources.collection.CollectionManager
+    :param collection: Pre-configured aioboto3 DynamoDB table collection manager
+    :type collection: aioboto3.resources.collection.AIOCollectionManager
+
+    ``all()``, ``filter()``, ``limit()`` and ``page_size()`` return async iterators:
+
+    >>> async for table in encrypted_resource.tables.all():
+    ...     await table.get_item(Key=key)
     :param CryptographicMaterialsProvider materials_provider: Cryptographic materials provider to use
     :param AttributeActions attribute_actions: Table-level configuration of how to encrypt/sign attributes
     :param TableInfoCache table_info_cache: Local cache from which to obtain TableInfo data
@@ -95,18 +100,18 @@ class EncryptedTablesCollectionManager(object):
         """
         return getattr(self._collection, name)
 
-    def _transform_table(self, method, **kwargs):
+    async def _transform_table(self, method, **kwargs):
         """Transform a Table from the underlying collection manager to an EncryptedTable.
 
         :param method: Method on underlying collection manager to call
         :type method: callable
         :param **kwargs: Keyword arguments to pass to ``method``
         """
-        for table in method(**kwargs):
+        async for table in method(**kwargs):
             yield EncryptedTable(
                 table=table,
                 materials_provider=self._materials_provider,
-                table_info=self._table_info_cache.table_info(table.name),
+                table_info=await self._table_info_cache.table_info(table.name),
                 attribute_actions=self._attribute_actions,
             )
 
@@ -116,20 +121,18 @@ class EncryptedResource(object):
     # pylint: disable=too-few-public-methods,too-many-instance-attributes
     """High-level helper class to provide a familiar interface to encrypted tables.
 
-    >>> import boto3
+    >>> import aioboto3
     >>> from dynamodb_encryption_sdk.encrypted.resource import EncryptedResource
     >>> from dynamodb_encryption_sdk.material_providers.wrapped import WrappedCryptographicMaterialsProvider
-    >>> resource = boto3.resource('dynamodb')
     >>> wrapped_cmp = WrappedCryptographicMaterialsProvider(signing_key, wrapping_key, unwrapping_key)
-    >>> encrypted_resource = EncryptedResource(
-    ...     resource=resource,
-    ...     materials_provider=wrapped_cmp
-    ... )
+    >>> async with aioboto3.Session().resource('dynamodb') as resource:
+    ...     encrypted_resource = EncryptedResource(resource=resource, materials_provider=wrapped_cmp)
+    ...     table = await encrypted_resource.Table('my_table')
 
     .. note::
 
-        This class provides a superset of the boto3 DynamoDB service resource API, so should
-        work as a drop-in replacement once configured.
+        This class provides a superset of the aioboto3 DynamoDB service resource API, so should
+        work as a drop-in replacement once configured. As in aioboto3, ``Table`` is a coroutine.
 
         https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/dynamodb/service-resource/index.html
 
@@ -137,8 +140,8 @@ class EncryptedResource(object):
         and ``batch_get_item`` methods will also accept a ``crypto_config`` parameter, defining
         a custom :class:`CryptoConfig` instance for this request.
 
-    :param resource: Pre-configured boto3 DynamoDB service resource object
-    :type resource: boto3.resources.base.ServiceResource
+    :param resource: Pre-configured aioboto3 DynamoDB service resource object
+    :type resource: aioboto3.resources.base.AIOBoto3ServiceResource
     :param CryptographicMaterialsProvider materials_provider: Cryptographic materials provider to use
     :param AttributeActions attribute_actions: Table-level configuration of how to encrypt/sign attributes
     :param bool auto_refresh_table_indexes: Should we attempt to refresh information about table indexes?
@@ -204,7 +207,7 @@ class EncryptedResource(object):
         """
         return getattr(self._resource, name)
 
-    def Table(self, name, **kwargs):
+    async def Table(self, name, **kwargs):
         # naming chosen to align with boto3 resource name, so pylint: disable=invalid-name
         """Creates an EncryptedTable resource.
 
@@ -221,11 +224,11 @@ class EncryptedResource(object):
             attributes (optional)
         """
         table_kwargs = dict(
-            table=self._resource.Table(name),
+            table=await self._resource.Table(name),
             materials_provider=kwargs.get("materials_provider", self._materials_provider),
             attribute_actions=kwargs.get("attribute_actions", self._attribute_actions),
             auto_refresh_table_indexes=kwargs.get("auto_refresh_table_indexes", self._auto_refresh_table_indexes),
-            table_info=self._table_info_cache.table_info(name),
+            table_info=await self._table_info_cache.table_info(name),
         )
 
         return EncryptedTable(**table_kwargs)
