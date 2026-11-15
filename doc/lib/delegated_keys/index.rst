@@ -7,5 +7,5 @@ Delegated Keys
 
 .. autosummary::
 
-    dynamodb_encryption_sdk.delegated_keys
-    dynamodb_encryption_sdk.delegated_keys.jce
+    dynamodb_encryption_sdk_async.delegated_keys
+    dynamodb_encryption_sdk_async.delegated_keys.jce

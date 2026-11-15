@@ -10,19 +10,19 @@
 # distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF
 # ANY KIND, either express or implied. See the License for the specific
 # language governing permissions and limitations under the License.
-"""Functional tests for ``dynamodb_encryption_sdk.encrypted.item``."""
+"""Functional tests for ``dynamodb_encryption_sdk_async.encrypted.item``."""
 import hypothesis
 import pytest
 
-from dynamodb_encryption_sdk.delegated_keys.jce import JceNameLocalDelegatedKey
-from dynamodb_encryption_sdk.encrypted import CryptoConfig
-from dynamodb_encryption_sdk.encrypted.item import decrypt_python_item, encrypt_python_item
-from dynamodb_encryption_sdk.exceptions import DecryptionError, EncryptionError
-from dynamodb_encryption_sdk.identifiers import CryptoAction
-from dynamodb_encryption_sdk.internal.identifiers import MaterialDescriptionKeys, ReservedAttributes
-from dynamodb_encryption_sdk.material_providers.static import StaticCryptographicMaterialsProvider
-from dynamodb_encryption_sdk.materials.raw import RawDecryptionMaterials, RawEncryptionMaterials
-from dynamodb_encryption_sdk.structures import AttributeActions, EncryptionContext
+from dynamodb_encryption_sdk_async.delegated_keys.jce import JceNameLocalDelegatedKey
+from dynamodb_encryption_sdk_async.encrypted import CryptoConfig
+from dynamodb_encryption_sdk_async.encrypted.item import decrypt_python_item, encrypt_python_item
+from dynamodb_encryption_sdk_async.exceptions import DecryptionError, EncryptionError
+from dynamodb_encryption_sdk_async.identifiers import CryptoAction
+from dynamodb_encryption_sdk_async.internal.identifiers import MaterialDescriptionKeys, ReservedAttributes
+from dynamodb_encryption_sdk_async.material_providers.static import StaticCryptographicMaterialsProvider
+from dynamodb_encryption_sdk_async.materials.raw import RawDecryptionMaterials, RawEncryptionMaterials
+from dynamodb_encryption_sdk_async.structures import AttributeActions, EncryptionContext
 
 from ..functional_test_utils import (
     build_static_jce_cmp,

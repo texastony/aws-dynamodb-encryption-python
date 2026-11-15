@@ -10,13 +10,13 @@
 # distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF
 # ANY KIND, either express or implied. See the License for the specific
 # language governing permissions and limitations under the License.
-"""Unit tests for ``dynamodb_encryption_sdk.material_providers.static``."""
+"""Unit tests for ``dynamodb_encryption_sdk_async.material_providers.static``."""
 import pytest
 from mock import MagicMock
 
-from dynamodb_encryption_sdk.material_providers.static import StaticCryptographicMaterialsProvider
-from dynamodb_encryption_sdk.materials import DecryptionMaterials, EncryptionMaterials
-from dynamodb_encryption_sdk.structures import EncryptionContext
+from dynamodb_encryption_sdk_async.material_providers.static import StaticCryptographicMaterialsProvider
+from dynamodb_encryption_sdk_async.materials import DecryptionMaterials, EncryptionMaterials
+from dynamodb_encryption_sdk_async.structures import EncryptionContext
 
 pytestmark = [pytest.mark.unit, pytest.mark.local]
 

@@ -11,18 +11,18 @@
 # distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF
 # ANY KIND, either express or implied. See the License for the specific
 # language governing permissions and limitations under the License.
-"""Test suite for ``dynamodb_encryption_sdk.internal.utils``."""
+"""Test suite for ``dynamodb_encryption_sdk_async.internal.utils``."""
 import copy
 
 import pytest
 from mock import Mock
 
-from dynamodb_encryption_sdk.encrypted import CryptoConfig
-from dynamodb_encryption_sdk.identifiers import CryptoAction
-from dynamodb_encryption_sdk.internal.utils import encrypt_batch_write_item
-from dynamodb_encryption_sdk.material_providers import CryptographicMaterialsProvider
-from dynamodb_encryption_sdk.structures import AttributeActions, EncryptionContext
-from dynamodb_encryption_sdk.transform import dict_to_ddb
+from dynamodb_encryption_sdk_async.encrypted import CryptoConfig
+from dynamodb_encryption_sdk_async.identifiers import CryptoAction
+from dynamodb_encryption_sdk_async.internal.utils import encrypt_batch_write_item
+from dynamodb_encryption_sdk_async.material_providers import CryptographicMaterialsProvider
+from dynamodb_encryption_sdk_async.structures import AttributeActions, EncryptionContext
+from dynamodb_encryption_sdk_async.transform import dict_to_ddb
 
 from ..functional_test_utils import diverse_item
 

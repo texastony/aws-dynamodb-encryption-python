@@ -1,4 +1,4 @@
 Item Encryptor
 --------------
 
-.. automodule:: dynamodb_encryption_sdk.encrypted.item
+.. automodule:: dynamodb_encryption_sdk_async.encrypted.item

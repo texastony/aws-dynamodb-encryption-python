@@ -14,8 +14,8 @@
 import hypothesis
 import pytest
 
-from dynamodb_encryption_sdk.exceptions import InvalidMaterialDescriptionError, InvalidMaterialDescriptionVersionError
-from dynamodb_encryption_sdk.internal.formatting.material_description import (
+from dynamodb_encryption_sdk_async.exceptions import InvalidMaterialDescriptionError, InvalidMaterialDescriptionVersionError
+from dynamodb_encryption_sdk_async.internal.formatting.material_description import (
     deserialize as deserialize_material_description,
     serialize as serialize_material_description,
 )

@@ -10,10 +10,10 @@
 # distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF
 # ANY KIND, either express or implied. See the License for the specific
 # language governing permissions and limitations under the License.
-"""Unit tests for ``dynamodb_encryption_sdk.structures``."""
+"""Unit tests for ``dynamodb_encryption_sdk_async.structures``."""
 import pytest
 
-from dynamodb_encryption_sdk.structures import EncryptionContext
+from dynamodb_encryption_sdk_async.structures import EncryptionContext
 
 
 @pytest.mark.parametrize("operator", (repr, str))

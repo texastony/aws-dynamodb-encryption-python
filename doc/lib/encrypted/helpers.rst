@@ -9,6 +9,6 @@ Helper Clients
 
 .. autosummary::
 
-    dynamodb_encryption_sdk.encrypted.table
-    dynamodb_encryption_sdk.encrypted.resource
-    dynamodb_encryption_sdk.encrypted.client
+    dynamodb_encryption_sdk_async.encrypted.table
+    dynamodb_encryption_sdk_async.encrypted.resource
+    dynamodb_encryption_sdk_async.encrypted.client

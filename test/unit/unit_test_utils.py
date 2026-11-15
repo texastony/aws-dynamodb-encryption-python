@@ -15,8 +15,8 @@ import itertools
 
 import pytest
 
-from dynamodb_encryption_sdk.delegated_keys.jce import JceNameLocalDelegatedKey
-from dynamodb_encryption_sdk.material_providers.wrapped import WrappedCryptographicMaterialsProvider
+from dynamodb_encryption_sdk_async.delegated_keys.jce import JceNameLocalDelegatedKey
+from dynamodb_encryption_sdk_async.material_providers.wrapped import WrappedCryptographicMaterialsProvider
 
 
 @pytest.fixture

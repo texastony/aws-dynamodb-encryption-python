@@ -4,6 +4,13 @@ This branch converts the DynamoDB Encryption Client to `asyncio`, on aioboto3 an
 It is based on `fbdf529` (v3.3.0) and was written to answer Question 2 of a proof of concept:
 can the DDBEC for Python be made async, assuming no KMS calls?
 
+## Package name
+
+The last commit renames the package to **`dynamodb_encryption_sdk_async`** (distribution
+`dynamodb-encryption-sdk-async`), so it can be installed alongside the synchronous PyPI
+`dynamodb-encryption-sdk`. To review the async conversion as an in-place diff against upstream,
+read the commits before the rename. The tables below use the original module names.
+
 ## Before the conversion
 
 These preparatory changes are in a separate commit:

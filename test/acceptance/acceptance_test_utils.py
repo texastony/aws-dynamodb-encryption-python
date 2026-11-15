@@ -20,12 +20,12 @@ from functools import partial
 import pytest
 from six.moves.urllib.parse import urlparse  # moves confuse pylint: disable=wrong-import-order
 
-from dynamodb_encryption_sdk.delegated_keys.jce import JceNameLocalDelegatedKey
-from dynamodb_encryption_sdk.identifiers import EncryptionKeyType, KeyEncodingType
-from dynamodb_encryption_sdk.material_providers.static import StaticCryptographicMaterialsProvider
-from dynamodb_encryption_sdk.material_providers.wrapped import WrappedCryptographicMaterialsProvider
-from dynamodb_encryption_sdk.materials.raw import RawDecryptionMaterials, RawEncryptionMaterials
-from dynamodb_encryption_sdk.structures import AttributeActions
+from dynamodb_encryption_sdk_async.delegated_keys.jce import JceNameLocalDelegatedKey
+from dynamodb_encryption_sdk_async.identifiers import EncryptionKeyType, KeyEncodingType
+from dynamodb_encryption_sdk_async.material_providers.static import StaticCryptographicMaterialsProvider
+from dynamodb_encryption_sdk_async.material_providers.wrapped import WrappedCryptographicMaterialsProvider
+from dynamodb_encryption_sdk_async.materials.raw import RawDecryptionMaterials, RawEncryptionMaterials
+from dynamodb_encryption_sdk_async.structures import AttributeActions
 
 from ..functional import functional_test_vector_generators
 

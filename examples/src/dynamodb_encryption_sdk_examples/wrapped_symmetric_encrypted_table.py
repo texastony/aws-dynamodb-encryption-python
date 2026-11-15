@@ -14,11 +14,11 @@
 import aioboto3
 from boto3.dynamodb.types import Binary
 
-from dynamodb_encryption_sdk.delegated_keys.jce import JceNameLocalDelegatedKey
-from dynamodb_encryption_sdk.encrypted.table import EncryptedTable
-from dynamodb_encryption_sdk.identifiers import CryptoAction, EncryptionKeyType, KeyEncodingType
-from dynamodb_encryption_sdk.material_providers.wrapped import WrappedCryptographicMaterialsProvider
-from dynamodb_encryption_sdk.structures import AttributeActions
+from dynamodb_encryption_sdk_async.delegated_keys.jce import JceNameLocalDelegatedKey
+from dynamodb_encryption_sdk_async.encrypted.table import EncryptedTable
+from dynamodb_encryption_sdk_async.identifiers import CryptoAction, EncryptionKeyType, KeyEncodingType
+from dynamodb_encryption_sdk_async.material_providers.wrapped import WrappedCryptographicMaterialsProvider
+from dynamodb_encryption_sdk_async.structures import AttributeActions
 
 
 async def encrypt_item(table_name, aes_wrapping_key_bytes, hmac_signing_key_bytes):

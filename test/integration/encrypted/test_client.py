@@ -10,7 +10,7 @@
 # distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF
 # ANY KIND, either express or implied. See the License for the specific
 # language governing permissions and limitations under the License.
-"""Integration tests for ``dynamodb_encryption_sdk.encrypted.client``."""
+"""Integration tests for ``dynamodb_encryption_sdk_async.encrypted.client``."""
 import pytest
 
 from ..integration_test_utils import (  # noqa pylint: disable=unused-import

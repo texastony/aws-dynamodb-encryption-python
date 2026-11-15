@@ -10,13 +10,13 @@
 # distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF
 # ANY KIND, either express or implied. See the License for the specific
 # language governing permissions and limitations under the License.
-"""Functional tests for ``dynamodb_encryption_sdk.structures``."""
+"""Functional tests for ``dynamodb_encryption_sdk_async.structures``."""
 import aioboto3
 import pytest
 
-from dynamodb_encryption_sdk.exceptions import InvalidArgumentError
-from dynamodb_encryption_sdk.identifiers import CryptoAction
-from dynamodb_encryption_sdk.structures import AttributeActions, TableIndex, TableInfo
+from dynamodb_encryption_sdk_async.exceptions import InvalidArgumentError
+from dynamodb_encryption_sdk_async.identifiers import CryptoAction
+from dynamodb_encryption_sdk_async.structures import AttributeActions, TableIndex, TableInfo
 
 from .functional_test_utils import example_table  # noqa=F401 pylint: disable=unused-import
 from .functional_test_utils import mock_ddb_service  # noqa=F401 pylint: disable=unused-import

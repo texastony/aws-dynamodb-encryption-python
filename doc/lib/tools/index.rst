@@ -9,6 +9,6 @@ Tools
 
 .. autosummary::
 
-    dynamodb_encryption_sdk.identifiers
-    dynamodb_encryption_sdk.structures
-    dynamodb_encryption_sdk.transform
+    dynamodb_encryption_sdk_async.identifiers
+    dynamodb_encryption_sdk_async.structures
+    dynamodb_encryption_sdk_async.transform

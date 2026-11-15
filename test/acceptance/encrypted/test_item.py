@@ -10,13 +10,13 @@
 # distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF
 # ANY KIND, either express or implied. See the License for the specific
 # language governing permissions and limitations under the License.
-"""Acceptance tests for ``dynamodb_encryption_sdk.encrypted.client``."""
-"""Acceptance tests for ``dynamodb_encryption_sdk.encrypted.item``."""
+"""Acceptance tests for ``dynamodb_encryption_sdk_async.encrypted.client``."""
+"""Acceptance tests for ``dynamodb_encryption_sdk_async.encrypted.item``."""
 import pytest
 
-from dynamodb_encryption_sdk.encrypted import CryptoConfig
-from dynamodb_encryption_sdk.encrypted.item import decrypt_dynamodb_item
-from dynamodb_encryption_sdk.structures import EncryptionContext
+from dynamodb_encryption_sdk_async.encrypted import CryptoConfig
+from dynamodb_encryption_sdk_async.encrypted.item import decrypt_dynamodb_item
+from dynamodb_encryption_sdk_async.structures import EncryptionContext
 
 from ..acceptance_test_utils import load_scenarios
 

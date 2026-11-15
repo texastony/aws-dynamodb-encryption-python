@@ -16,7 +16,7 @@ def read(*args):
 
 def get_release():
     """Reads the release (full three-part version number) from this module."""
-    init = read("..", "src", "dynamodb_encryption_sdk", "identifiers.py")
+    init = read("..", "src", "dynamodb_encryption_sdk_async", "identifiers.py")
     return VERSION_RE.search(init).group(1)
 
 

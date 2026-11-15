@@ -10,8 +10,8 @@
 # distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF
 # ANY KIND, either express or implied. See the License for the specific
 # language governing permissions and limitations under the License.
-"""Acceptance tests for ``dynamodb_encryption_sdk.encrypted.client``."""
-"""Acceptance tests for ``dynamodb_encryption_sdk.encrypted.resource``."""
+"""Acceptance tests for ``dynamodb_encryption_sdk_async.encrypted.client``."""
+"""Acceptance tests for ``dynamodb_encryption_sdk_async.encrypted.resource``."""
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -19,9 +19,9 @@ from aiobotocore.client import AioBaseClient
 from boto3.resources.base import ServiceResource
 from boto3.resources.collection import CollectionManager
 
-from dynamodb_encryption_sdk.encrypted.resource import EncryptedResource
-from dynamodb_encryption_sdk.structures import TableIndex, TableInfo
-from dynamodb_encryption_sdk.transform import ddb_to_dict
+from dynamodb_encryption_sdk_async.encrypted.resource import EncryptedResource
+from dynamodb_encryption_sdk_async.structures import TableIndex, TableInfo
+from dynamodb_encryption_sdk_async.transform import ddb_to_dict
 
 from ..acceptance_test_utils import load_scenarios
 
