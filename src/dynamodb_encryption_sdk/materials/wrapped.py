@@ -16,7 +16,6 @@ import copy
 from typing import Dict, Optional, Text
 
 import attr
-import six
 
 from dynamodb_encryption_sdk.delegated_keys import DelegatedKey
 from dynamodb_encryption_sdk.delegated_keys.jce import JceNameLocalDelegatedKey
@@ -58,7 +57,7 @@ class WrappedCryptographicMaterials(CryptographicMaterials):
         validator=attr.validators.optional(attr.validators.instance_of(DelegatedKey)), default=None
     )
     _material_description = attr.ib(
-        validator=dictionary_validator(six.string_types, six.string_types),
+        validator=dictionary_validator(str, str),
         converter=copy.deepcopy,
         default=attr.Factory(dict),
     )

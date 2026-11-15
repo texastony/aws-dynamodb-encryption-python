@@ -41,12 +41,12 @@ class EncryptedTable(object):
 
     >>> import boto3
     >>> from dynamodb_encryption_sdk.encrypted.table import EncryptedTable
-    >>> from dynamodb_encryption_sdk.material_providers.aws_kms import AwsKmsCryptographicMaterialsProvider
+    >>> from dynamodb_encryption_sdk.material_providers.wrapped import WrappedCryptographicMaterialsProvider
     >>> table = boto3.resource('dynamodb').Table('my_table')
-    >>> aws_kms_cmp = AwsKmsCryptographicMaterialsProvider('alias/MyKmsAlias')
+    >>> wrapped_cmp = WrappedCryptographicMaterialsProvider(signing_key, wrapping_key, unwrapping_key)
     >>> encrypted_table = EncryptedTable(
     ...     table=table,
-    ...     materials_provider=aws_kms_cmp
+    ...     materials_provider=wrapped_cmp
     ... )
 
     .. note::

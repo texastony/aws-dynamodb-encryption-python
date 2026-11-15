@@ -14,15 +14,13 @@
 import abc
 from typing import Dict, Text
 
-import six
 
 from dynamodb_encryption_sdk.delegated_keys import DelegatedKey  # noqa pylint: disable=unused-import
 
 __all__ = ("CryptographicMaterials", "EncryptionMaterials", "DecryptionMaterials")
 
 
-@six.add_metaclass(abc.ABCMeta)
-class CryptographicMaterials(object):
+class CryptographicMaterials(metaclass=abc.ABCMeta):
     """Base class for all cryptographic materials."""
 
     @property

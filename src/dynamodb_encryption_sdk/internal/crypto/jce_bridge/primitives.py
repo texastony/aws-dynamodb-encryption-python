@@ -22,7 +22,6 @@ import os
 from typing import Any, Callable, Text
 
 import attr
-import six
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes, keywrap, padding as symmetric_padding, serialization
 from cryptography.hazmat.primitives.asymmetric import padding as asymmetric_padding, rsa
@@ -95,8 +94,7 @@ class _NoPadding(object):
         return self._NoPadder()
 
 
-@six.add_metaclass(abc.ABCMeta)
-class JavaPadding(object):
+class JavaPadding(metaclass=abc.ABCMeta):
     # pylint: disable=too-few-public-methods
     """Bridge the gap from the Java padding names and Python resources.
     https://docs.oracle.com/javase/8/docs/technotes/guides/security/StandardNames.html#Cipher
@@ -112,7 +110,7 @@ class SimplePadding(JavaPadding):
     # pylint: disable=too-few-public-methods
     """Padding types that do not require any preparation."""
 
-    java_name = attr.ib(validator=attr.validators.instance_of(six.string_types))
+    java_name = attr.ib(validator=attr.validators.instance_of(str))
     padding = attr.ib(validator=callable_validator)
 
     def __init__(self, java_name, padding):  # type: (Text, Callable) -> None  # noqa=D107
@@ -138,7 +136,7 @@ class BlockSizePadding(JavaPadding):
     # pylint: disable=too-few-public-methods
     """Padding types that require a block size input."""
 
-    java_name = attr.ib(validator=attr.validators.instance_of(six.string_types))
+    java_name = attr.ib(validator=attr.validators.instance_of(str))
     padding = attr.ib(validator=callable_validator)
 
     def __init__(self, java_name, padding):  # type: (Text, Callable) -> None  # noqa=D107
@@ -174,7 +172,7 @@ class OaepPadding(JavaPadding):
         created with MGF1-SHA1.
     """
 
-    java_name = attr.ib(validator=attr.validators.instance_of(six.string_types))
+    java_name = attr.ib(validator=attr.validators.instance_of(str))
     padding = attr.ib(validator=callable_validator)
     digest = attr.ib(validator=callable_validator)
     mgf = attr.ib(validator=callable_validator)
@@ -216,7 +214,7 @@ class JavaMode(object):
     https://docs.oracle.com/javase/8/docs/technotes/guides/security/StandardNames.html#Cipher
     """
 
-    java_name = attr.ib(validator=attr.validators.instance_of(six.string_types))
+    java_name = attr.ib(validator=attr.validators.instance_of(str))
     mode = attr.ib(validator=callable_validator)
 
     def __init__(self, java_name, mode):  # type: (Text, Callable) -> None  # noqa=D107
@@ -244,7 +242,7 @@ class JavaEncryptionAlgorithm(object):
     https://docs.oracle.com/javase/8/docs/technotes/guides/security/StandardNames.html#Cipher
     """
 
-    java_name = attr.ib(validator=attr.validators.instance_of(six.string_types))
+    java_name = attr.ib(validator=attr.validators.instance_of(str))
     cipher = attr.ib()
 
     def __init__(self, java_name, cipher):  # type: (Text, Callable) -> None  # noqa=D107

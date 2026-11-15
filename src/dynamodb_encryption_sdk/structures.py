@@ -15,7 +15,6 @@ import copy
 from typing import Dict, Iterable, List, Optional, Set, Text
 
 import attr
-import six
 
 from dynamodb_encryption_sdk.exceptions import InvalidArgumentError
 from dynamodb_encryption_sdk.internal.identifiers import ReservedAttributes
@@ -53,21 +52,21 @@ class EncryptionContext(object):
     """
 
     table_name = attr.ib(
-        validator=attr.validators.optional(attr.validators.instance_of(six.string_types)), default=None
+        validator=attr.validators.optional(attr.validators.instance_of(str)), default=None
     )
     partition_key_name = attr.ib(
-        validator=attr.validators.optional(attr.validators.instance_of(six.string_types)), default=None
+        validator=attr.validators.optional(attr.validators.instance_of(str)), default=None
     )
     sort_key_name = attr.ib(
-        validator=attr.validators.optional(attr.validators.instance_of(six.string_types)), default=None
+        validator=attr.validators.optional(attr.validators.instance_of(str)), default=None
     )
     attributes = attr.ib(
         repr=False,
-        validator=(dictionary_validator(six.string_types, dict), _validate_attribute_values_are_ddb_items),
+        validator=(dictionary_validator(str, dict), _validate_attribute_values_are_ddb_items),
         default=attr.Factory(dict),
     )
     material_description = attr.ib(
-        validator=dictionary_validator(six.string_types, six.string_types),
+        validator=dictionary_validator(str, str),
         converter=copy.deepcopy,
         default=attr.Factory(dict),
     )
@@ -108,7 +107,7 @@ class AttributeActions(object):
 
     default_action = attr.ib(validator=attr.validators.instance_of(CryptoAction), default=CryptoAction.ENCRYPT_AND_SIGN)
     attribute_actions = attr.ib(
-        validator=dictionary_validator(six.string_types, CryptoAction), default=attr.Factory(dict)
+        validator=dictionary_validator(str, CryptoAction), default=attr.Factory(dict)
     )
 
     def __init__(
@@ -214,8 +213,8 @@ class TableIndex(object):
     :param str sort: Name of the sort attribute (optional)
     """
 
-    partition = attr.ib(validator=attr.validators.instance_of(six.string_types))
-    sort = attr.ib(validator=attr.validators.optional(attr.validators.instance_of(six.string_types)), default=None)
+    partition = attr.ib(validator=attr.validators.instance_of(str))
+    sort = attr.ib(validator=attr.validators.optional(attr.validators.instance_of(str)), default=None)
 
     def __init__(self, partition, sort=None):  # noqa=D107
         # type: (Text, Optional[Text]) -> None
@@ -266,7 +265,7 @@ class TableInfo(object):
     :type secondary_indexes: list(TableIndex)
     """
 
-    name = attr.ib(validator=attr.validators.instance_of(six.string_types))
+    name = attr.ib(validator=attr.validators.instance_of(str))
     _primary_index = attr.ib(validator=attr.validators.optional(attr.validators.instance_of(TableIndex)), default=None)
     _secondary_indexes = attr.ib(validator=attr.validators.optional(iterable_validator(list, TableIndex)), default=None)
 

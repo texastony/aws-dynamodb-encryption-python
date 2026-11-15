@@ -18,7 +18,6 @@ import os
 from typing import Dict, Optional, Text
 
 import attr
-import six
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
@@ -103,7 +102,7 @@ class JceNameLocalDelegatedKey(DelegatedKey):
     """
 
     key = attr.ib(validator=attr.validators.instance_of(bytes), repr=False)
-    _algorithm = attr.ib(validator=attr.validators.instance_of(six.string_types))
+    _algorithm = attr.ib(validator=attr.validators.instance_of(str))
     _key_type = attr.ib(validator=attr.validators.instance_of(EncryptionKeyType))
     _key_encoding = attr.ib(validator=attr.validators.instance_of(KeyEncodingType))
 

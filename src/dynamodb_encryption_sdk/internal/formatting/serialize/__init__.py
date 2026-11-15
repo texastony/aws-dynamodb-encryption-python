@@ -38,7 +38,7 @@ def encode_value(value):
     """Encodes the value in Length-Value format.
 
     :param value: Value to encode
-    :type value: six.string_types or :class:`boto3.dynamodb_encryption_sdk.types.Binary`
+    :type value: str or :class:`boto3.dynamodb_encryption_sdk.types.Binary`
     :returns: Length-Value encoded value
     :rtype: bytes
     """

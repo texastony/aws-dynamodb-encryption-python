@@ -21,7 +21,6 @@ import logging
 from typing import Any, Callable, Text
 
 import attr
-import six
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes, hmac
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
@@ -37,8 +36,7 @@ __all__ = ("JavaAuthenticator", "JavaMac", "JavaSignature", "JAVA_AUTHENTICATOR"
 _LOGGER = logging.getLogger(LOGGER_NAME)
 
 
-@six.add_metaclass(abc.ABCMeta)
-class JavaAuthenticator(object):
+class JavaAuthenticator(metaclass=abc.ABCMeta):
     """Parent class for all Java bridges that provide authentication characteristics."""
 
     @abc.abstractmethod
@@ -96,7 +94,7 @@ class JavaMac(JavaAuthenticator):
     https://docs.oracle.com/javase/8/docs/technotes/guides/security/StandardNames.html#Mac
     """
 
-    java_name = attr.ib(validator=attr.validators.instance_of(six.string_types))
+    java_name = attr.ib(validator=attr.validators.instance_of(str))
     algorithm_type = attr.ib(validator=callable_validator)
     hash_type = attr.ib(validator=callable_validator)
 
@@ -197,7 +195,7 @@ class JavaSignature(JavaAuthenticator):
     https://docs.oracle.com/javase/8/docs/technotes/guides/security/StandardNames.html#Signature
     """
 
-    java_name = attr.ib(validator=attr.validators.instance_of(six.string_types))
+    java_name = attr.ib(validator=attr.validators.instance_of(str))
     algorithm_type = attr.ib()
     hash_type = attr.ib(validator=callable_validator)
     padding_type = attr.ib(validator=callable_validator)

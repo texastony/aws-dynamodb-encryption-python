@@ -14,7 +14,6 @@
 import abc
 from typing import Dict, Optional, Text
 
-import six
 
 from dynamodb_encryption_sdk.identifiers import EncryptionKeyType  # noqa pylint: disable=unused-import
 
@@ -30,8 +29,7 @@ def _raise_not_implemented(method_name):
     raise NotImplementedError('"{}" is not supported by this DelegatedKey'.format(method_name))
 
 
-@six.add_metaclass(abc.ABCMeta)
-class DelegatedKey(object):
+class DelegatedKey(metaclass=abc.ABCMeta):
     """Delegated keys are black boxes that encrypt, decrypt, sign, and verify data and wrap
     and unwrap keys. Not all delegated keys implement all methods.
 

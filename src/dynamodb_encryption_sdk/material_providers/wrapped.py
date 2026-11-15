@@ -14,7 +14,6 @@
 from typing import Dict, Optional, Text
 
 import attr
-import six
 
 from dynamodb_encryption_sdk.delegated_keys import DelegatedKey
 from dynamodb_encryption_sdk.exceptions import UnwrappingError, WrappingError
@@ -52,7 +51,7 @@ class WrappedCryptographicMaterialsProvider(CryptographicMaterialsProvider):
         validator=attr.validators.optional(attr.validators.instance_of(DelegatedKey)), default=None
     )
     _material_description = attr.ib(
-        validator=attr.validators.optional(dictionary_validator(six.string_types, six.string_types)),
+        validator=attr.validators.optional(dictionary_validator(str, str)),
         default=attr.Factory(dict),
     )
 

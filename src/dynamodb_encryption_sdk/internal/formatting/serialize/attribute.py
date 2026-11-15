@@ -126,7 +126,7 @@ def serialize_attribute(attribute):  # noqa: C901 pylint: disable=too-many-local
         # for some reason pylint can't follow the Enum member attributes
         """
         :param _attribute: Attribute to serialize
-        :type _attribute: six.string_types
+        :type _attribute: str
         :returns: Serialized _attribute
         :rtype: bytes
         """
