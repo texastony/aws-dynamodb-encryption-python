@@ -31,11 +31,11 @@ pytestmark = [pytest.mark.unit, pytest.mark.local]
         ("encryption_materials", WrappingError, "Encryption materials cannot be provided: no wrapping key"),
     ),
 )
-def test_no_materials(method, error_type, message):
+async def test_no_materials(method, error_type, message):
     empty_cmp = WrappedCryptographicMaterialsProvider(signing_key=MagicMock(__class__=DelegatedKey))
 
     with pytest.raises(error_type) as excinfo:
-        getattr(empty_cmp, method)(EncryptionContext())
+        await getattr(empty_cmp, method)(EncryptionContext())
 
     excinfo.match(message)
 
@@ -53,7 +53,7 @@ def test_attrs_fail(invalid_kwargs):
 
 
 @pytest.mark.parametrize("method", ("decryption_materials", "encryption_materials"))
-def test_valid_materials(mocker, method):
+async def test_valid_materials(mocker, method):
     mocker.patch.object(WrappedCryptographicMaterialsProvider, "_build_materials")
 
     cmp = WrappedCryptographicMaterialsProvider(
@@ -63,7 +63,7 @@ def test_valid_materials(mocker, method):
     )
 
     context = EncryptionContext()
-    test = getattr(cmp, method)(context)
+    test = await getattr(cmp, method)(context)
 
     WrappedCryptographicMaterialsProvider._build_materials.assert_called_once_with(context)
     assert test is WrappedCryptographicMaterialsProvider._build_materials.return_value

@@ -35,32 +35,32 @@ def pytest_generate_tests(metafunc):
     set_parametrized_item(metafunc)
 
 
-def _resource_cycle_batch_items_check(materials_provider, initial_actions, initial_item):
-    resource_cycle_batch_items_check(
+async def _resource_cycle_batch_items_check(materials_provider, initial_actions, initial_item):
+    await resource_cycle_batch_items_check(
         materials_provider, initial_actions, initial_item, TEST_TABLE_NAME, TEST_REGION_NAME
     )
 
 
-def _resource_batch_items_unprocessed_check(materials_provider, initial_actions, initial_item):
-    resource_batch_items_unprocessed_check(
+async def _resource_batch_items_unprocessed_check(materials_provider, initial_actions, initial_item):
+    await resource_batch_items_unprocessed_check(
         materials_provider, initial_actions, initial_item, TEST_TABLE_NAME, TEST_REGION_NAME
     )
 
 
-def test_ephemeral_batch_item_cycle(example_table, some_cmps, parametrized_actions, parametrized_item):
+async def test_ephemeral_batch_item_cycle(example_table, some_cmps, parametrized_actions, parametrized_item):
     """Test a small number of curated CMPs against a small number of curated items."""
-    _resource_cycle_batch_items_check(some_cmps, parametrized_actions, parametrized_item)
+    await _resource_cycle_batch_items_check(some_cmps, parametrized_actions, parametrized_item)
 
 
-def test_batch_item_unprocessed(example_table, parametrized_actions, parametrized_item):
+async def test_batch_item_unprocessed(example_table, parametrized_actions, parametrized_item):
     """Test Unprocessed Items handling with a single ephemeral static CMP against a small number of curated items."""
-    _resource_batch_items_unprocessed_check(
+    await _resource_batch_items_unprocessed_check(
         build_static_jce_cmp("AES", 256, "HmacSHA256", 256), parametrized_actions, parametrized_item
     )
 
 
 @pytest.mark.travis_isolation
 @pytest.mark.slow
-def test_ephemeral_batch_item_cycle_slow(example_table, all_the_cmps, parametrized_actions, parametrized_item):
+async def test_ephemeral_batch_item_cycle_slow(example_table, all_the_cmps, parametrized_actions, parametrized_item):
     """Test ALL THE CMPS against a small number of curated items."""
-    _resource_cycle_batch_items_check(all_the_cmps, parametrized_actions, parametrized_item)
+    await _resource_cycle_batch_items_check(all_the_cmps, parametrized_actions, parametrized_item)

@@ -17,7 +17,6 @@ API
    :caption: Key Management
 
    lib/materials_providers/providers
-   lib/materials_providers/provider_stores
    lib/materials/index
 
 .. toctree::

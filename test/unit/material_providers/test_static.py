@@ -28,11 +28,11 @@ pytestmark = [pytest.mark.unit, pytest.mark.local]
         ("encryption_materials", "No encryption materials available"),
     ),
 )
-def test_no_materials(method, message):
+async def test_no_materials(method, message):
     empty_cmp = StaticCryptographicMaterialsProvider()
 
     with pytest.raises(AttributeError) as excinfo:
-        getattr(empty_cmp, method)(EncryptionContext())
+        await getattr(empty_cmp, method)(EncryptionContext())
 
     excinfo.match(message)
 
@@ -53,8 +53,8 @@ def test_attrs_fail(invalid_kwargs):
         (MagicMock(__class__=EncryptionMaterials), "encryption_materials"),
     ),
 )
-def test_valid_materials(materials, method):
+async def test_valid_materials(materials, method):
     kwargs = {method: materials}
     static_cmp = StaticCryptographicMaterialsProvider(**kwargs)
 
-    assert getattr(static_cmp, method)(EncryptionContext()) is materials
+    assert (await getattr(static_cmp, method)(EncryptionContext())) is materials

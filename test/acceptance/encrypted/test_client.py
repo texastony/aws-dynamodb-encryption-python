@@ -11,10 +11,11 @@
 # ANY KIND, either express or implied. See the License for the specific
 # language governing permissions and limitations under the License.
 """Acceptance tests for ``dynamodb_encryption_sdk.encrypted.client``."""
-import botocore
+"""Acceptance tests for ``dynamodb_encryption_sdk.encrypted.client``."""
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
-from mock import MagicMock
-from moto import mock_dynamodb2
+from aiobotocore.client import AioBaseClient
 
 from dynamodb_encryption_sdk.encrypted.client import EncryptedClient
 from dynamodb_encryption_sdk.structures import TableIndex, TableInfo
@@ -26,9 +27,9 @@ pytestmark = [pytest.mark.accept]
 
 
 def fake_client(table_name, item):
-    client = MagicMock(__class__=botocore.client.BaseClient)
-    client.get_item.return_value = {"Item": item.copy()}
-    client.batch_get_item.return_value = {"Responses": {table_name: [item.copy()]}}
+    client = MagicMock(__class__=AioBaseClient)
+    client.get_item = AsyncMock(return_value={"Item": item.copy()})
+    client.batch_get_item = AsyncMock(return_value={"Responses": {table_name: [item.copy()]}})
     return client
 
 
@@ -58,15 +59,17 @@ def _client_setup(materials_provider, table_name, table_index, ciphertext_item, 
     return e_client, dict_to_ddb(item_key)
 
 
-def _item_check(materials_provider, table_name, table_index, ciphertext_item, plaintext_item, attribute_actions):
+async def _item_check(materials_provider, table_name, table_index, ciphertext_item, plaintext_item, attribute_actions):
     e_client, item_key = _client_setup(materials_provider, table_name, table_index, ciphertext_item, attribute_actions)
-    decrypted_item = e_client.get_item(TableName=table_name, Key=item_key)["Item"]
+    decrypted_item = (await e_client.get_item(TableName=table_name, Key=item_key))["Item"]
     _compare_item(plaintext_item, decrypted_item)
 
 
-def _batch_items_check(materials_provider, table_name, table_index, ciphertext_item, plaintext_item, attribute_actions):
+async def _batch_items_check(
+    materials_provider, table_name, table_index, ciphertext_item, plaintext_item, attribute_actions
+):
     e_client, item_key = _client_setup(materials_provider, table_name, table_index, ciphertext_item, attribute_actions)
-    response = e_client.batch_get_item(RequestItems={table_name: {"Keys": [item_key]}})
+    response = await e_client.batch_get_item(RequestItems={table_name: {"Keys": [item_key]}})
     decrypted_item = response["Responses"][table_name][0]
     _compare_item(plaintext_item, decrypted_item)
 
@@ -79,42 +82,9 @@ def pytest_generate_tests(metafunc):
         )
 
 
-@mock_dynamodb2
 @pytest.mark.local
-@pytest.mark.parametrize(
-    "materials_provider, table_name, table_index, ciphertext_item, plaintext_item, attribute_actions, prep",
-    load_scenarios(online=False),
-)
-def test_client_get_offline(
-    materials_provider, table_name, table_index, ciphertext_item, plaintext_item, attribute_actions, prep, item_checker
+@pytest.mark.parametrize("materials_provider, table_name, table_index, ciphertext_item, plaintext_item, attribute_actions", load_scenarios(online=False))
+async def test_client_get_offline(
+    materials_provider, table_name, table_index, ciphertext_item, plaintext_item, attribute_actions, item_checker
 ):
-    metatable = None
-    try:
-        metatable = prep()
-        return item_checker(
-            materials_provider, table_name, table_index, ciphertext_item, plaintext_item, attribute_actions
-        )
-    finally:
-        if metatable:
-            metatable.delete()
-            metatable.wait_until_not_exists()
-
-
-@pytest.mark.ddb_integ
-@pytest.mark.parametrize(
-    "materials_provider, table_name, table_index, ciphertext_item, plaintext_item, attribute_actions, prep",
-    load_scenarios(online=True),
-)
-def test_client_get_online(
-    materials_provider, table_name, table_index, ciphertext_item, plaintext_item, attribute_actions, prep, item_checker
-):
-    metatable = None
-    try:
-        metatable = prep()
-        return item_checker(
-            materials_provider, table_name, table_index, ciphertext_item, plaintext_item, attribute_actions
-        )
-    finally:
-        if metatable:
-            metatable.delete()
-            metatable.wait_until_not_exists()
+    await item_checker(materials_provider, table_name, table_index, ciphertext_item, plaintext_item, attribute_actions)

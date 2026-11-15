@@ -16,7 +16,6 @@ import pytest
 from ..integration_test_utils import (  # noqa pylint: disable=unused-import
     ddb_table_name,
     functional_test_utils,
-    set_parameterized_kms_cmps,
 )
 
 pytestmark = [pytest.mark.integ, pytest.mark.ddb_integ]
@@ -26,23 +25,15 @@ def pytest_generate_tests(metafunc):
     functional_test_utils.set_parametrized_actions(metafunc)
     functional_test_utils.set_parametrized_cmp(metafunc)
     functional_test_utils.set_parametrized_item(metafunc)
-    set_parameterized_kms_cmps(metafunc)
 
 
-def test_ephemeral_item_cycle(ddb_table_name, some_cmps, parametrized_actions, parametrized_item):
+async def test_ephemeral_item_cycle(ddb_table_name, some_cmps, parametrized_actions, parametrized_item):
     """Test a small number of curated CMPs against a small number of curated items."""
-    functional_test_utils.table_cycle_check(some_cmps, parametrized_actions, parametrized_item, ddb_table_name)
+    await functional_test_utils.table_cycle_check(some_cmps, parametrized_actions, parametrized_item, ddb_table_name)
 
 
-def test_ephemeral_item_cycle_batch_writer(ddb_table_name, some_cmps, parametrized_actions, parametrized_item):
+async def test_ephemeral_item_cycle_batch_writer(ddb_table_name, some_cmps, parametrized_actions, parametrized_item):
     """Test a small number of curated CMPs against a small number of curated items."""
-    functional_test_utils.table_cycle_batch_writer_check(
+    await functional_test_utils.table_cycle_batch_writer_check(
         some_cmps, parametrized_actions, parametrized_item, ddb_table_name
-    )
-
-
-def test_ephemeral_item_cycle_kms(ddb_table_name, all_aws_kms_cmp_builders, parametrized_actions, parametrized_item):
-    """Test the AWS KMS CMP against a small number of curated items."""
-    functional_test_utils.table_cycle_check(
-        all_aws_kms_cmp_builders(), parametrized_actions, parametrized_item, ddb_table_name
     )

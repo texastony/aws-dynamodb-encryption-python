@@ -11,7 +11,7 @@
 # ANY KIND, either express or implied. See the License for the specific
 # language governing permissions and limitations under the License.
 """Example showing use of a symmetric wrapped CMP with EncryptedTable."""
-import boto3
+import aioboto3
 from boto3.dynamodb.types import Binary
 
 from dynamodb_encryption_sdk.delegated_keys.jce import JceNameLocalDelegatedKey
@@ -21,7 +21,7 @@ from dynamodb_encryption_sdk.material_providers.wrapped import WrappedCryptograp
 from dynamodb_encryption_sdk.structures import AttributeActions
 
 
-def encrypt_item(table_name, aes_wrapping_key_bytes, hmac_signing_key_bytes):
+async def encrypt_item(table_name, aes_wrapping_key_bytes, hmac_signing_key_bytes):
     """Demonstrate use of EncryptedTable to transparently encrypt an item."""
     index_key = {"partition_attribute": "is this", "sort_attribute": 55}
     plaintext_item = {
@@ -39,48 +39,49 @@ def encrypt_item(table_name, aes_wrapping_key_bytes, hmac_signing_key_bytes):
     # Add the index pairs to the item.
     plaintext_item.update(index_key)
 
-    # Create a normal table resource.
-    table = boto3.resource("dynamodb").Table(table_name)  # generated code confuse pylint: disable=no-member
-    # Create a crypto materials provider using the provided wrapping and signing keys.
-    wrapping_key = JceNameLocalDelegatedKey(
-        key=aes_wrapping_key_bytes,
-        algorithm="AES",
-        key_type=EncryptionKeyType.SYMMETRIC,
-        key_encoding=KeyEncodingType.RAW,
-    )
-    signing_key = JceNameLocalDelegatedKey(
-        key=hmac_signing_key_bytes,
-        algorithm="HmacSHA512",
-        key_type=EncryptionKeyType.SYMMETRIC,
-        key_encoding=KeyEncodingType.RAW,
-    )
-    wrapped_cmp = WrappedCryptographicMaterialsProvider(
-        wrapping_key=wrapping_key, unwrapping_key=wrapping_key, signing_key=signing_key
-    )
-    # Create attribute actions that tells the encrypted table to encrypt all attributes except one.
-    actions = AttributeActions(
-        default_action=CryptoAction.ENCRYPT_AND_SIGN, attribute_actions={"leave me": CryptoAction.DO_NOTHING}
-    )
-    # Use these objects to create an encrypted table resource.
-    encrypted_table = EncryptedTable(table=table, materials_provider=wrapped_cmp, attribute_actions=actions)
+    # Create a normal (aioboto3) table resource.
+    async with aioboto3.Session().resource("dynamodb") as resource:
+        table = await resource.Table(table_name)
+        # Create a crypto materials provider using the provided wrapping and signing keys.
+        wrapping_key = JceNameLocalDelegatedKey(
+            key=aes_wrapping_key_bytes,
+            algorithm="AES",
+            key_type=EncryptionKeyType.SYMMETRIC,
+            key_encoding=KeyEncodingType.RAW,
+        )
+        signing_key = JceNameLocalDelegatedKey(
+            key=hmac_signing_key_bytes,
+            algorithm="HmacSHA512",
+            key_type=EncryptionKeyType.SYMMETRIC,
+            key_encoding=KeyEncodingType.RAW,
+        )
+        wrapped_cmp = WrappedCryptographicMaterialsProvider(
+            wrapping_key=wrapping_key, unwrapping_key=wrapping_key, signing_key=signing_key
+        )
+        # Create attribute actions that tells the encrypted table to encrypt all attributes except one.
+        actions = AttributeActions(
+            default_action=CryptoAction.ENCRYPT_AND_SIGN, attribute_actions={"leave me": CryptoAction.DO_NOTHING}
+        )
+        # Use these objects to create an encrypted table resource.
+        encrypted_table = EncryptedTable(table=table, materials_provider=wrapped_cmp, attribute_actions=actions)
 
-    # Put the item to the table, using the encrypted table resource to transparently encrypt it.
-    encrypted_table.put_item(Item=plaintext_item)
+        # Put the item to the table, using the encrypted table resource to transparently encrypt it.
+        await encrypted_table.put_item(Item=plaintext_item)
 
-    # Get the encrypted item using the standard table resource.
-    encrypted_item = table.get_item(Key=index_key)["Item"]
+        # Get the encrypted item using the standard table resource.
+        encrypted_item = (await table.get_item(Key=index_key))["Item"]
 
-    # Get the item using the encrypted table resource, transparently decyrpting it.
-    decrypted_item = encrypted_table.get_item(Key=index_key)["Item"]
+        # Get the item using the encrypted table resource, transparently decyrpting it.
+        decrypted_item = (await encrypted_table.get_item(Key=index_key))["Item"]
 
-    # Verify that all of the attributes are different in the encrypted item
-    for name in encrypted_attributes:
-        assert encrypted_item[name] != plaintext_item[name]
-        assert decrypted_item[name] == plaintext_item[name]
+        # Verify that all of the attributes are different in the encrypted item
+        for name in encrypted_attributes:
+            assert encrypted_item[name] != plaintext_item[name]
+            assert decrypted_item[name] == plaintext_item[name]
 
-    # Verify that all of the attributes that should not be encrypted were not.
-    for name in unencrypted_attributes:
-        assert decrypted_item[name] == encrypted_item[name] == plaintext_item[name]
+        # Verify that all of the attributes that should not be encrypted were not.
+        for name in unencrypted_attributes:
+            assert decrypted_item[name] == encrypted_item[name] == plaintext_item[name]
 
-    # Clean up the item
-    encrypted_table.delete_item(Key=index_key)
+        # Clean up the item
+        await encrypted_table.delete_item(Key=index_key)

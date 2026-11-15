@@ -38,40 +38,40 @@ def pytest_generate_tests(metafunc):
     set_parametrized_item(metafunc)
 
 
-def _table_cycle_check(materials_provider, initial_actions, initial_item):
-    return table_cycle_check(materials_provider, initial_actions, initial_item, TEST_TABLE_NAME, TEST_REGION_NAME)
+async def _table_cycle_check(materials_provider, initial_actions, initial_item):
+    return await table_cycle_check(materials_provider, initial_actions, initial_item, TEST_TABLE_NAME, TEST_REGION_NAME)
 
 
-def test_ephemeral_item_cycle(example_table, some_cmps, parametrized_actions, parametrized_item):
+async def test_ephemeral_item_cycle(example_table, some_cmps, parametrized_actions, parametrized_item):
     """Test a small number of curated CMPs against a small number of curated items."""
-    _table_cycle_check(some_cmps, parametrized_actions, parametrized_item)
+    await _table_cycle_check(some_cmps, parametrized_actions, parametrized_item)
 
 
-def test_ephemeral_item_cycle_batch_writer(example_table, some_cmps, parametrized_actions, parametrized_item):
+async def test_ephemeral_item_cycle_batch_writer(example_table, some_cmps, parametrized_actions, parametrized_item):
     """Test a small number of curated CMPs against a small number of curated items."""
-    table_cycle_batch_writer_check(
+    await table_cycle_batch_writer_check(
         some_cmps, parametrized_actions, parametrized_item, TEST_TABLE_NAME, TEST_REGION_NAME
     )
 
 
-def test_batch_writer_unprocessed(example_table, parametrized_actions, parametrized_item):
+async def test_batch_writer_unprocessed(example_table, parametrized_actions, parametrized_item):
     """Test Unprocessed Items handling with a single ephemeral static CMP against a small number of curated items."""
     cmp = build_static_jce_cmp("AES", 256, "HmacSHA256", 256)
-    table_batch_writer_unprocessed_items_check(
+    await table_batch_writer_unprocessed_items_check(
         cmp, parametrized_actions, parametrized_item, TEST_TABLE_NAME, TEST_REGION_NAME
     )
 
 
 @pytest.mark.slow
-def test_ephemeral_item_cycle_slow(example_table, all_the_cmps, parametrized_actions, parametrized_item):
+async def test_ephemeral_item_cycle_slow(example_table, all_the_cmps, parametrized_actions, parametrized_item):
     """Test ALL THE CMPS against a small number of curated items."""
-    _table_cycle_check(all_the_cmps, parametrized_actions, parametrized_item)
+    await _table_cycle_check(all_the_cmps, parametrized_actions, parametrized_item)
 
 
 @pytest.mark.slow
-def test_ephemeral_item_cycle_batch_writer_slow(example_table, all_the_cmps, parametrized_actions, parametrized_item):
+async def test_ephemeral_item_cycle_batch_writer_slow(example_table, all_the_cmps, parametrized_actions, parametrized_item):
     """Test a small number of curated CMPs against a small number of curated items."""
-    table_cycle_batch_writer_check(
+    await table_cycle_batch_writer_check(
         all_the_cmps, parametrized_actions, parametrized_item, TEST_TABLE_NAME, TEST_REGION_NAME
     )
 
@@ -81,24 +81,24 @@ def test_ephemeral_item_cycle_batch_writer_slow(example_table, all_the_cmps, par
 @pytest.mark.hypothesis
 @SLOW_SETTINGS
 @hypothesis.given(item=ddb_items)
-def test_ephemeral_item_cycle_hypothesis_slow(example_table, some_cmps, hypothesis_actions, item):
+async def test_ephemeral_item_cycle_hypothesis_slow(example_table, some_cmps, hypothesis_actions, item):
     """Test a small number of curated CMPs against a large number of items."""
-    _table_cycle_check(some_cmps, hypothesis_actions, item)
+    await _table_cycle_check(some_cmps, hypothesis_actions, item)
 
 
 @pytest.mark.veryslow
 @pytest.mark.hypothesis
 @VERY_SLOW_SETTINGS
 @hypothesis.given(item=ddb_items)
-def test_ephemeral_item_cycle_hypothesis_veryslow(example_table, some_cmps, hypothesis_actions, item):
+async def test_ephemeral_item_cycle_hypothesis_veryslow(example_table, some_cmps, hypothesis_actions, item):
     """Test a small number of curated CMPs against ALL THE ITEMS."""
-    _table_cycle_check(some_cmps, hypothesis_actions, item)
+    await _table_cycle_check(some_cmps, hypothesis_actions, item)
 
 
 @pytest.mark.nope
 @pytest.mark.hypothesis
 @VERY_SLOW_SETTINGS
 @hypothesis.given(item=ddb_items)
-def test_ephemeral_item_cycle_hypothesis_nope(example_table, all_the_cmps, hypothesis_actions, item):
+async def test_ephemeral_item_cycle_hypothesis_nope(example_table, all_the_cmps, hypothesis_actions, item):
     """Test ALL THE CMPs against ALL THE ITEMS."""
-    _table_cycle_check(all_the_cmps, hypothesis_actions, item)
+    await _table_cycle_check(all_the_cmps, hypothesis_actions, item)

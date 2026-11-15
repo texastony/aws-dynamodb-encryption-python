@@ -72,17 +72,23 @@ def get_dummy_crypto_config(partition_key_name=None, sort_key_name=None, sign_ke
     return CryptoConfig(materials_provider=materials, encryption_context=context, attribute_actions=actions)
 
 
-def check_encrypt_batch_write_item_call(request_items, crypto_config):
-    def dummy_encrypt(item, **kwargs):
+async def check_encrypt_batch_write_item_call(request_items, crypto_config):
+    async def dummy_encrypt(item, **kwargs):
         result = item.copy()
         result["encrypt-me"] = "pretend Im encrypted"
         return result
 
+    async def write_method(**kwargs):
+        return {"UnprocessedItems": kwargs["RequestItems"]}
+
+    async def crypto_config_method(**kwargs):
+        return crypto_config
+
     # execute a batch write, but make the write method return ALL the provided items as unprocessed
-    result = encrypt_batch_write_item(
+    result = await encrypt_batch_write_item(
         encrypt_method=dummy_encrypt,
-        write_method=lambda **kwargs: {"UnprocessedItems": kwargs["RequestItems"]},
-        crypto_config_method=lambda **kwargs: crypto_config,
+        write_method=write_method,
+        crypto_config_method=crypto_config_method,
         RequestItems=copy.deepcopy(request_items),
     )
 
@@ -95,9 +101,9 @@ def check_encrypt_batch_write_item_call(request_items, crypto_config):
 @pytest.mark.parametrize(
     "items", (get_test_items(standard_dict_format=True), get_test_items(standard_dict_format=False))
 )
-def test_encrypt_batch_write_returns_plaintext_unprocessed_items_with_known_partition_key(items):
+async def test_encrypt_batch_write_returns_plaintext_unprocessed_items_with_known_partition_key(items):
     crypto_config = get_dummy_crypto_config("partition-key")
-    check_encrypt_batch_write_item_call(items, crypto_config)
+    await check_encrypt_batch_write_item_call(items, crypto_config)
 
 
 @pytest.mark.parametrize(
@@ -107,9 +113,9 @@ def test_encrypt_batch_write_returns_plaintext_unprocessed_items_with_known_part
         get_test_items(standard_dict_format=False, with_sort_keys=True),
     ),
 )
-def test_encrypt_batch_write_returns_plaintext_unprocessed_items_with_known_partition_and_sort_keys(items):
+async def test_encrypt_batch_write_returns_plaintext_unprocessed_items_with_known_partition_and_sort_keys(items):
     crypto_config = get_dummy_crypto_config("partition-key", "sort-key")
-    check_encrypt_batch_write_item_call(items, crypto_config)
+    await check_encrypt_batch_write_item_call(items, crypto_config)
 
 
 @pytest.mark.parametrize(
@@ -121,10 +127,10 @@ def test_encrypt_batch_write_returns_plaintext_unprocessed_items_with_known_part
         get_test_items(standard_dict_format=False, with_sort_keys=True),
     ),
 )
-def test_encrypt_batch_write_returns_plaintext_unprocessed_items_with_unknown_keys(items):
+async def test_encrypt_batch_write_returns_plaintext_unprocessed_items_with_unknown_keys(items):
     crypto_config = get_dummy_crypto_config(None, None)
 
-    check_encrypt_batch_write_item_call(items, crypto_config)
+    await check_encrypt_batch_write_item_call(items, crypto_config)
 
 
 @pytest.mark.parametrize(
@@ -136,17 +142,17 @@ def test_encrypt_batch_write_returns_plaintext_unprocessed_items_with_unknown_ke
         get_test_items(standard_dict_format=False, with_sort_keys=True),
     ),
 )
-def test_encrypt_batch_write_returns_plaintext_unprocessed_items_with_unknown_signed_keys(items):
+async def test_encrypt_batch_write_returns_plaintext_unprocessed_items_with_unknown_signed_keys(items):
     crypto_config = get_dummy_crypto_config(None, None, sign_keys=True)
 
-    check_encrypt_batch_write_item_call(items, crypto_config)
+    await check_encrypt_batch_write_item_call(items, crypto_config)
 
 
-def test_encrypt_batch_write_returns_plaintext_unprocessed_items_over_multiple_tables():
+async def test_encrypt_batch_write_returns_plaintext_unprocessed_items_over_multiple_tables():
     crypto_config = get_dummy_crypto_config("partition-key", "sort-key")
 
     items = get_test_items(standard_dict_format=True, table_name="table-one", with_sort_keys=True)
     more_items = get_test_items(standard_dict_format=False, table_name="table-two", with_sort_keys=True)
     items.update(more_items)
 
-    check_encrypt_batch_write_item_call(items, crypto_config)
+    await check_encrypt_batch_write_item_call(items, crypto_config)
