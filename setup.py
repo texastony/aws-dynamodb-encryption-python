@@ -27,7 +27,7 @@ def get_requirements():
 
 
 setup(
-    name="dynamodb-encryption-sdk",
+    name="dynamodb-encryption-sdk-async",
     version=get_version(),
     packages=find_packages("src"),
     package_dir={"": "src"},
@@ -35,7 +35,7 @@ setup(
     author="Amazon Web Services",
     author_email="aws-cryptools@amazon.com",
     maintainer="Amazon Web Services",
-    description="DynamoDB Encryption Client for Python",
+    description="DynamoDB Encryption Client for Python (async fork, on aioboto3)",
     long_description=read("README.rst"),
     keywords="dynamodb-encryption-sdk aws kms encryption dynamodb",
     data_files=["README.rst", "CHANGELOG.rst", "LICENSE", "requirements.txt"],
