@@ -42,3 +42,20 @@ The boundary is I/O. DynamoDB calls are awaited, and so are the materials provid
 - `_process_batch_write_response`, which restores plaintext for `UnprocessedItems`.
 - `update_item`, which still raises `NotImplementedError`.
 - The `__getattr__` pass-throughs.
+
+## Acceptance tests: what was removed
+
+The acceptance tests (`test/acceptance/encrypted/`) decrypt the vectors in `test/vectors/encrypted_item/`.
+Each scenario in `scenarios.json` has a `network` flag:
+- the `*_offline` tests (`local`) read the scenarios that don't need AWS;
+- the `*_online` tests (`ddb_integ`) read those that need real AWS: a real KMS key, or a MetaStore table in real DynamoDB.
+
+This branch removed the `awskms` and `most_recent` (MetaStore) providers, so `load_scenarios` now loads only the `static` and `wrapped` scenarios. The removed scenarios:
+
+| Provider | Network | Ciphertext files | Count |
+|---|---|---|---|
+| `awskms` | online | `aws-kms-direct-1.json` (Java, Python) | 2 |
+| `most_recent` (MetaStore over KMS) | online | `metastore-data-tables-3.json` (Java, Python) | 2 |
+| `most_recent` (MetaStore) | offline | `metastore-*` | 4 |
+
+Every online scenario is one of these, so `load_scenarios(online=True)` loads nothing, and the four `test_*_get_online` tests were removed rather than left with empty parameters. The 14 `static` and `wrapped` scenarios (224 items) are still decrypted by all four acceptance suites: client (single item and batch), item, resource, and table.
